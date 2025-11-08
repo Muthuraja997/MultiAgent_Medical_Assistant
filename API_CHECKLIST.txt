@@ -1,0 +1,220 @@
+================================================================================
+🔐 API REQUIREMENTS CHECKLIST - Multi-Agent Medical Assistant
+================================================================================
+
+CHOOSE YOUR SETUP:
+  [ ] Path 1: Cloud Setup (Azure OpenAI) → Cost: $16/mo, Speed: Fast ⚡
+  [ ] Path 2: Open-Source Setup (Ollama) → Cost: $0/mo, Speed: Slow 🐢
+  [ ] Path 3: Hybrid Setup (Azure + Local DB) → Cost: $15/mo, Speed: Very Fast ⚡⚡
+
+================================================================================
+REQUIRED API KEYS - CHOOSE ONE:
+================================================================================
+
+OPTION A: AZURE OPENAI (For Cloud or Hybrid)
+  Get from: https://portal.azure.com/
+  
+  [ ] deployment_name
+      Example: gpt-4o-deployment
+      Where: Azure Portal → OpenAI resource → Deployment name
+  
+  [ ] model_name
+      Example: gpt-4o
+      Where: Azure Portal → OpenAI resource → Model type
+  
+  [ ] azure_endpoint
+      Example: https://my-resource.openai.azure.com/
+      Where: Azure Portal → OpenAI resource → Endpoint URL
+  
+  [ ] openai_api_key (Key 1 or Key 2)
+      Where: Azure Portal → OpenAI resource → Keys and Endpoint
+      ⚠️  NEVER share this key!
+  
+  [ ] openai_api_version
+      Example: 2024-05-01
+      Where: Leave as-is or check Azure documentation
+  
+  [ ] embedding_deployment_name (can be same as above)
+      Example: text-embedding-3-large-deployment
+  
+  [ ] embedding_model_name (can be same as above)
+      Example: text-embedding-3-large
+  
+  [ ] embedding_azure_endpoint (can be same as above)
+      Example: https://my-resource.openai.azure.com/
+  
+  [ ] embedding_openai_api_key (can be same as above)
+      (Your embedding API key)
+
+---
+
+OPTION B: OLLAMA (For Open-Source)
+  Get from: https://ollama.ai/
+  
+  No API keys needed! ✅
+  
+  Installation steps:
+  [ ] Download Ollama from https://ollama.ai/
+  [ ] Install it
+  [ ] Run: ollama serve (keep running)
+  [ ] Run: ollama pull mistral (download model)
+  
+  Then modify config.py:
+  [ ] Replace AzureChatOpenAI with OllamaLLM
+  [ ] Replace AzureOpenAIEmbeddings with OllamaEmbeddings
+  [ ] Point to: http://localhost:11434
+
+================================================================================
+OPTIONAL API KEYS - CAN SKIP:
+================================================================================
+
+WEB SEARCH API - PICK ONE OR SKIP:
+
+Option 1: Tavily API (if you want paid web search)
+  [ ] TAVILY_API_KEY
+      Get from: https://tavily.com/
+      Cost: Free tier (50/month), then $0.05 per 1000
+      Usage: Improved web search results
+
+Option 2: DuckDuckGo (free web search, no key needed)
+  [ ] Modify: agents/web_search_processor_agent/tavily_search.py
+  [ ] Use: duckduckgo-search library
+  [ ] Cost: FREE
+
+---
+
+SPEECH API - PICK ONE OR SKIP:
+
+Option 1: ElevenLabs (if you want cloud text-to-speech)
+  [ ] ELEVEN_LABS_API_KEY
+      Get from: https://elevenlabs.io/ → Account → API Key
+      Cost: Free tier (10,000 chars/month)
+      Usage: Voice output in UI
+
+Option 2: pyttsx3 (free local text-to-speech, already installed)
+  [ ] Already included in requirements.txt
+  [ ] Cost: FREE
+  [ ] Modify: app.py to use pyttsx3 instead of ElevenLabs
+
+---
+
+VECTOR DATABASE - PICK ONE:
+
+Option 1: Local Qdrant (default, no key needed) ✅
+  [ ] Automatically uses: ./data/qdrant_db/
+  [ ] Cost: FREE
+  [ ] Setup: Nothing! It's automatic.
+
+Option 2: Qdrant Cloud (if you want cloud storage, not recommended)
+  [ ] QDRANT_URL
+      Get from: https://cloud.qdrant.io/
+  [ ] QDRANT_API_KEY
+  [ ] Cost: Paid tier
+  [ ] Note: Local is faster and cheaper
+
+================================================================================
+🎯 QUICK SETUP DECISION TREE:
+================================================================================
+
+Question 1: Do you have an Azure OpenAI subscription?
+  YES  → Go to Question 2
+  NO   → Skip to Question 3
+
+Question 2: Do you prefer cloud speed or local cost savings?
+  CLOUD → Use Path 1 (Cloud Setup)
+         Get: Azure OpenAI keys only
+  LOCAL → Use Path 3 (Hybrid Setup)
+         Get: Azure OpenAI keys only (Qdrant is local)
+  NO     → Go to Question 3
+
+Question 3: Do you want complete local/free setup?
+  YES → Use Path 2 (Open-Source Setup)
+       Get: Nothing! Just install Ollama
+  NO  → Use Path 1 or 3 (Cloud)
+
+================================================================================
+📋 MY SETUP CHOICE:
+================================================================================
+
+I am choosing: [ ] Path 1  [ ] Path 2  [ ] Path 3
+
+API Keys I need:
+  ☐ deployment_name = ____________________________
+  ☐ model_name = ____________________________
+  ☐ azure_endpoint = ____________________________
+  ☐ openai_api_key = ____________________________
+  ☐ openai_api_version = ____________________________
+  ☐ embedding_deployment_name = ____________________________
+  ☐ embedding_model_name = ____________________________
+  ☐ embedding_azure_endpoint = ____________________________
+  ☐ embedding_openai_api_key = ____________________________
+
+Optional APIs:
+  ☐ TAVILY_API_KEY = ____________________________
+  ☐ ELEVEN_LABS_API_KEY = ____________________________
+  ☐ QDRANT_URL = ____________________________
+  ☐ QDRANT_API_KEY = ____________________________
+
+================================================================================
+✅ FINAL CHECKLIST:
+================================================================================
+
+Before running setup.sh:
+  [ ] Python 3.11+ installed (check: python3 --version)
+  [ ] 10GB free disk space
+  [ ] Internet connection
+  [ ] Decided on setup path (1, 2, or 3)
+  [ ] Gathered API keys (if needed)
+
+Running setup.sh:
+  [ ] Made executable: chmod +x setup.sh
+  [ ] Run it: ./setup.sh
+  [ ] Chose option: 1 or 2 or 3
+  [ ] Followed all prompts
+  [ ] Tests passed
+
+After setup:
+  [ ] .env file created
+  [ ] Virtual environment created
+  [ ] Dependencies installed
+  [ ] Configuration validated
+
+Before using:
+  [ ] Documents ingested (optional)
+  [ ] Server started: python app.py
+  [ ] Browser accessible: http://localhost:8000
+  [ ] Can submit queries and get responses
+
+================================================================================
+🔗 SIGNUP LINKS (if needed):
+================================================================================
+
+Azure OpenAI:
+  https://azure.microsoft.com/en-us/products/ai-services/openai-service/
+  
+Tavily API:
+  https://tavily.com/
+  
+ElevenLabs:
+  https://elevenlabs.io/
+  
+Qdrant Cloud:
+  https://cloud.qdrant.io/
+  
+Ollama:
+  https://ollama.ai/
+
+================================================================================
+💡 TIPS:
+================================================================================
+
+• Always use .env file for sensitive keys (NEVER commit to git!)
+• Use different keys for dev/staging/production
+• Monitor Azure usage monthly to avoid surprise charges
+• For production, use environment variables instead of .env file
+• Document your setup choice for team members
+• Backup your .env file securely
+
+================================================================================
+🚀 READY? RUN: chmod +x setup.sh && ./setup.sh
+================================================================================

@@ -1,0 +1,129 @@
+# Requirements for Multi-Agent Medical Assistant
+# 
+# This file lists all dependencies for the full cloud setup.
+# For open-source alternatives, see SETUP_GUIDE.md
+# 
+# Install with: pip install -r requirements.txt
+
+# Core dependencies - included in main requirements.txt
+-r requirements.txt
+
+# ============================================================================
+# OPEN-SOURCE ALTERNATIVES (Optional, instead of cloud APIs)
+# ============================================================================
+# 
+# Use ONLY if you're setting up the open-source version
+# See SETUP_GUIDE.md for detailed instructions
+
+# Instead of Azure OpenAI: Use Ollama with LangChain
+# langchain-ollama==0.1.1  # Uncomment if using Ollama
+
+# Instead of ElevenLabs: Use pyttsx3 for local TTS
+# pyttsx3==2.90  # Uncomment for local text-to-speech
+# sounddevice==0.4.6  # Uncomment if using audio input
+
+# Instead of Tavily: Use DuckDuckGo for web search
+# duckduckgo-search==3.9.10  # Uncomment for local web search
+
+# Instead of Vosk or Whisper: Use OpenAI Whisper for local STT
+# openai-whisper==20240930  # Uncomment for local speech-to-text
+
+# ============================================================================
+# DEVELOPMENT TOOLS (Optional)
+# ============================================================================
+
+# Testing
+# pytest==8.0.0
+# pytest-asyncio==0.23.0
+
+# Formatting and linting
+# black==24.1.0
+# flake8==7.0.0
+# mypy==1.8.0
+
+# Documentation
+# sphinx==7.2.0
+# sphinx-rtd-theme==2.0.0
+
+# Debugging
+# ipdb==0.13.13
+# debugpy==1.8.0
+
+# ============================================================================
+# GPU ACCELERATION (Optional, for faster local inference)
+# ============================================================================
+# 
+# For NVIDIA GPU:
+# torch==2.1.0 --index-url https://download.pytorch.org/whl/cu121
+# torchvision==0.16.0 --index-url https://download.pytorch.org/whl/cu121
+# torchaudio==2.1.0 --index-url https://download.pytorch.org/whl/cu121
+#
+# For M1/M2 Mac (Metal acceleration):
+# torch==2.1.0
+# torchvision==0.16.0
+# torchaudio==2.1.0
+#
+# For AMD GPU (ROCm):
+# torch==2.1.0 --index-url https://download.pytorch.org/whl/rocm5.7
+
+# ============================================================================
+# PLATFORM-SPECIFIC NOTES
+# ============================================================================
+#
+# Windows:
+#   - Some packages may need Visual C++ redistributables
+#   - Use: pip install pipwin
+#
+# macOS:
+#   - For M1/M2, ensure architecture: uname -m
+#   - May need to install system dependencies: brew install
+#
+# Linux:
+#   - Ensure python3-dev is installed: sudo apt-get install python3-dev
+#
+# Docker:
+#   - Use: docker build -t medical-assistant .
+#   - Run: docker run -p 8000:8000 medical-assistant
+
+# ============================================================================
+# QUICK COMMANDS
+# ============================================================================
+#
+# Install all dependencies:
+#   pip install -r requirements.txt
+#
+# Install with GPU support (NVIDIA):
+#   pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu121
+#   pip install -r requirements.txt
+#
+# Install open-source alternatives:
+#   pip install langchain-ollama pyttsx3 duckduckgo-search openai-whisper
+#
+# Upgrade all packages:
+#   pip install --upgrade -r requirements.txt
+#
+# Create requirements from current environment:
+#   pip freeze > requirements-freeze.txt
+
+# ============================================================================
+# COMMON ISSUES
+# ============================================================================
+#
+# "No module named torch":
+#   -> pip install torch (with appropriate --index-url for your GPU)
+#
+# "qdrant-client version mismatch":
+#   -> pip install --upgrade qdrant-client langchain-qdrant
+#
+# "Ollama not found":
+#   -> Install from https://ollama.ai
+#   -> Run: ollama serve
+#
+# "pyttsx3 error":
+#   -> Linux: sudo apt-get install espeak libespeak-dev
+#   -> macOS: works out of box
+#   -> Windows: works out of box
+#
+# See SETUP_GUIDE.md for more troubleshooting
+
+# ============================================================================
