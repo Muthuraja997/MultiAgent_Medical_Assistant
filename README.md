@@ -292,11 +292,6 @@ docker logs medical-assistant-app
 
 ## 📌 Option 2: Without Using Docker  <a name="manual-setup"></a>
 
-### 1️⃣ Clone the Repository  
-```bash  
-git clone https://github.com/souvikmajumder26/Multi-Agent-Medical-Assistant.git  
-cd Multi-Agent-Medical-Assistant  
-```
 
 ### 2️⃣ Create & Activate Virtual Environment  
 - If using conda:
