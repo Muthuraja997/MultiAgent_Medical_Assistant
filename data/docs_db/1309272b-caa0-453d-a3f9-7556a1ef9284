@@ -1,0 +1,9 @@
+## Inception
+
+The Inception architecture is an architecture used in the field of deep learning and CNN. It is designed to perform feature extraction and classification tasks more efficiently. First introduced in a paper titled "Going Deeper with Convolutions", the Inception architecture aims to provide better performance when processing complex visual datasets 25 . The Inception architecture has a structure that includes parallel convolution layers and combines the outputs of these layers. In this way, features of different sizes can be captured and processed   simultaneously 25 .
+
+Vol.:(0123456789)
+
+<!-- page_break -->
+
+Vol:.(1234567890)

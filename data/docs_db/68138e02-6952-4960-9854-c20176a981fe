@@ -1,0 +1,5 @@
+## EfficientNET
+
+EfficientNet is a family of scalable and efficient CNN models. The main goal of this series is to achieve better performance with fewer parameters. The term "EfficientNet" is a combination of the words "efficiency" and "network". The model series is mainly used in visual processing tasks such as image classification.
+
+EfficientNet is a family of models that delivers competitive results in both performance and computational cost. It offers variations of different size and complexity at different scales. Higher numbered models are typically larger and more complex, but require more computing power. It was the top performing model in the ImageNet competition 24 .

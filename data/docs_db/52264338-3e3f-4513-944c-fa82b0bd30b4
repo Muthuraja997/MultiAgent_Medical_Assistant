@@ -1,0 +1,19 @@
+## Multi-layer CNN
+
+First, we need to determine the architecture of our model. The input form of our data is 400 × 400 and has 3 channels. Since we have a total of 4 different classes, the number of output classes is set to 4. Our model has a structure that includes convolutional and pooling layers. First, there is a 3 × 3 convolutional layer with 32 filters. This is followed by a 2 × 2 max pooling layer. This reduces the size by emphasizing lower-level features. To deepen our model, this structure is repeated twice, adding convolutional layers with 64 and 128 filters, respectively, and maximum pooling layers of size 2 × 2.
+
+Table 2. Confusion matrix.
+
+|                | Actual value   | Actual value   | Actual value   |
+|----------------|----------------|----------------|----------------|
+|                | Positive       | Negative       | Total          |
+| Estimate value | Estimate value | Estimate value | Estimate value |
+| Positive       | T p            | F p            | TPos           |
+| Negative       | F N            | T N            | TNeg           |
+| Total          | Pos            | Neg            | M              |
+
+<!-- page_break -->
+
+The resulting feature map is transformed into a flat vector with a flattening layer. A hidden (dense) layer of 128 neurons is then added. This layer deepens the learned features and increases generalization. Finally, the output layer has 4 neurons and calculates the probabilities between classes with the softmax activation function. To train our model, we need to determine the optimal function and metrics. In this paper, we use the Rectified Adam optimization algorithm. This algorithm dynamically adjusts the learning rate and helps to use gradients more efficiently. Also, categorical cross-entropy is used as the loss function during training, as it is widely used in multiclass classification task.
+
+The metrics tracked during training are accuracy, as well as precision and recall. These metrics are important for evaluating the classification performance of the model. In addition, a reduced learning rate recall (ReduceLROnPlateau) is used to dynamically adjust the learning rate. This recall reduces the learning rate when the loss function flattens out during the training process, resulting in more stable training. The epoch is set to 14 and the batch size to 10.

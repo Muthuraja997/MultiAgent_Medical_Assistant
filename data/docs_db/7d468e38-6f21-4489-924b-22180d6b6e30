@@ -1,0 +1,3 @@
+## VGG
+
+This architecture stands as a notable CNN model introduced   by 24 , which builds upon its predecessor, the AlexNet model. It achieves this enhancement by replacing the initial 11 × 11 and 5 × 5 kernels in the first two convolutional layers with a series of consecutive 3 × 3 kernels. The model occupies approximately 528 MB of storage space and has achieved a documented top-5 accuracy of 90.1% on ImageNet data, encompassing approximately 138.4 million parameters. The ImageNet dataset comprises approximately 14 million images categorized across 1000 classes. The training of VGG16 was conducted on robust GPUs over the span of several weeks. This study used VGG16 and VGG19.

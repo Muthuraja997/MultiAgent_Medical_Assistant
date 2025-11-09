@@ -1,0 +1,3 @@
+## Classification using pre-trained convolution neural network model
+
+In this research, different versions of either full or segmented chest X-ray images have been introduced to CNN models to train the classifiers. Different experiments have been carried out on the original and segmented lung X-ray images both with their different enhanced versions. The classification has been done using   VGG19 14 and EfficientNetB0 16 pre-trained CNN models. After the calculation of different performance metrics, the best model has been selected as the adopted model. The next subsections give a brief description of the used pre-trained models.

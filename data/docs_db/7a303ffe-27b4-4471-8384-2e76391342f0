@@ -1,0 +1,15 @@
+## Results and discussion
+
+As part of the study, CNN and CNN-based transfer learning models such as InceptionV3, EfficientNetB4, VGG19 were trained on open-source shared brain tumor patients. The best accuracy result was obtained with EfficientNetB4 with 95%. The comparison of the brain tumor studies with the literature is shown in Table 4.
+
+As shown in Table 4, the CNN-based transfer learning models used in the study performed better. AI in healthcare plays an important role in the management of complex diseases such as brain tumors. AI enables faster, more accurate, and more effective diagnosis and treatment processes. However, AI technology is not intended to completely replace doctors, but to support and enhance their work. To realize the full potential of AI, it is important to consider issues such as ethics, security and privacy. In the future, AI-based solutions will continue to contribute to better management of brain tumors and other health problems, and improve the quality of life
+
+<!-- page_break -->
+
+Figure 4. The ROC curve of ( a ) CNN model, ( b ) EfficientNetB4 model, ( c ) VGG19 model ( d ) InceptionV3 model, ( e ) VGG16.
+
+picture_counter_4 The image contains five ROC curves, each labeled with a different model name: CNN, EfficientNetB4, VGG19, InceptionV3, and VGG16. Each ROC curve plots the true positive rate against the false positive rate for four classes: glioma tumor, meningioma tumor, no tumor, and pituitary tumor. The AUC values are provided for each class in each model.
+
+for patients. As seen in this study, AI-based studies will increase their importance to human health, from early diagnosis to positive progress in the treatment process.
+
+Based on the results of this study, transfer learning methods should be preferred especially in image processing-based applications to support health decision makers. The data obtained from MRI or CT can be used as an early warning system to help health decision makers make quick and accurate decisions. Therefore, in addition to empirical analysis, AI-based applications should take a more active role as soon as possible. To this end, the diagnosis of diseases from instant CT or MR images will be investigated in the coming years.

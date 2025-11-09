@@ -1,0 +1,70 @@
+## Performance evaluation
+
+A benchmark dataset was employed to validate the performance of the proposed framework. For binary classification, a set of 1600 X-ray images (800 of each class) have been used to train CNN models using transfer learning. The dataset has been divided into three subsets training, validation, and test sets. The training set is used for learning the model and adjusting the parameters. The validation set is to test the model during the training phase and fine-tune the parameters. The test set is to evaluate the trained model. The division was done as 400 samples (25%) of the used X-ray images were selected randomly for testing (200 images for each class), and the remaining 75% samples were split again into training and validation splits (80-20%). For 4-classes classification, a set of 3200 X-ray images (800 of each class) have been used. Before training CNN models, different preprocessing steps were implemented to enhance the images of both full and segmented lungs chest X-ray images to investigate the classification performance of the CNN models using the different versions.
+
+The following metrics were used for the evaluation of the different CNN models trained using various dataset versions:
+
+$$S \text {activity} / \text {Recall} ( \% ) = \frac { T P } { T P + F N }$$
+
+$$P r e c i s i o n ( \% ) = \frac { T p } { T P + F P }$$
+
+$$\text {Specify} ( \% ) = \frac { \text {TN} } { \text {TN} + \text {FP} } \quad ( 3 )$$
+
+$$A c u r c a y ( \% ) = \frac { T P + T N } { T P + F P + T N + F N }$$
+
+\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_ \_\_\_\_\_
+
+==============================================================
+
+| dense (Dense)     | (None, 1024)   |   25691136 |
+|-------------------|----------------|------------|
+| dense_1 (Dense)   | (None, 512)    |     524800 |
+| dense_2 (Dense)   | (None, 256)    |     131328 |
+| dropout (Dropout) | (None, 256)    |          0 |
+| dense_3 (Dense)   | (None, 2)      |        514 |
+
+Total params: 39,292,738
+
+Trainable params: 26,347,778
+
+Non-trainable params: 12,944,960
+
+\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_ \_\_\_\_\_\_\_\_
+
+Figure 5. Fine-tuned top layers based on VGG19 pre-training model.
+
+\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_ \_
+
+dense (Dense)                  (None, 1024)         5243904
+
+dense\_1 (Dense)                (None, 512)          524800
+
+dense\_2 (Dense)                (None, 256)          131328
+
+dropout (Dropout)
+
+(None, 256)          0
+
+dense\_3 (Dense)                (None, 2)            514
+
+=================================================================
+
+Total params: 9,534,117
+
+Trainable params: 5,900,546
+
+Non-trainable params: 3,633,571
+
+\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_\_ \_
+
+Figure 6. Fine-tuned top layers based on EfficientNetB0 pre-training model.
+
+Vol.:(0123456789)
+
+<!-- page_break -->
+
+Vol:.(1234567890)
+
+$$F l s c o r = \frac { 2 T P } { 2 T P + F P + F N }$$
+
+where TP is a true-positive value, FP is a false-positive value, TN is a true-negative value and FN is a falsenegative value.

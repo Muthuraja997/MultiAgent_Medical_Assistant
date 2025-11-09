@@ -1,0 +1,3 @@
+## The proposed framework
+
+In this section, the proposed framework has been explained. First, the used chest X-ray dataset has been described. Then, the developed framework, which includes 'pre-processing' phase and the 'Classification using CNN models based on transfer learning' phase, has been illustrated. Two different approaches have been used to train pre-trained CNN models using transfer learning. The first approach uses whole chest X-ray images, while the other approach uses lung-segmented images.

@@ -1,0 +1,45 @@
+## Resizing images phase
+
+Resizing the images is an essential process to satisfy the requirement of CNN of equally sized input images. In this research, the process of resizing X-ray images has been done to fit all X-ray images to the input size of the used pre-trained CNN models which are VGG19 and EfficientNetB0. Therefore, all images' versions either full or segmented versions were resized to fit the CNNs input image size which is 224 × 224 pixels. To expedite
+
+picture_counter_5 The image shows a chest X-ray with visible lung abnormalities.
+
+(a) Original COVID-31
+
+picture_counter_6 The image shows a histogram. The x-axis ranges from approximately 0 to 250, and the y-axis ranges from 0 to 3000. The histogram has a bimodal distribution, with peaks around 100 and 175. The bars are blue with black outlines.
+
+(e) Histogram of original image
+
+picture_counter_7 Chest X-ray showing lung abnormalities.
+
+( b) Enhanced HE
+
+picture_counter_8 The image shows a bar plot, with the x-axis ranging from 0 to 250 and the y-axis ranging from 0 to 3500. The plot consists of vertical bars of varying heights, predominantly in the range of 1000 to 3000 on the y-axis.
+
+(f) Histogram of HE image
+
+picture_counter_9 Chest X-ray image showing lungs and rib cage. The lung fields have some visible opacities or infiltrates.
+
+(c) Enhanced CLAHE
+
+picture_counter_10 The image shows a bar plot, possibly a histogram, with the x-axis ranging from 0 to 250 and the y-axis ranging from 0 to 3000. The bars are light blue. The distribution appears unimodal with a peak around 150, and a smaller peak around 210. This could represent the distribution of pixel intensities in a medical image.
+
+(g) Histogram of CLAHE
+
+(d) Complement
+
+picture_counter_11 Chest X-ray image showing lung abnormalities.
+
+(h) Histogram of complement
+
+picture_counter_12 The image shows a histogram. The x-axis ranges from approximately 40 to 260. The y-axis ranges from 0 to 3000. The histogram shows the frequency distribution of pixel intensity values, with peaks around 60, 100, and 140. There is also a small peak around 250.
+
+Figure 2. An X-ray image and its enhanced versions after applying HE, CLAHE and complement to the original image and the corresponding histogram plots.
+
+<!-- page_break -->
+
+Figure 3. X-ray original image and its enhanced versions and the segmented lung region of each version.
+
+picture_counter_13 The image shows a pipeline for lung segmentation from chest X-rays. The top row displays four chest X-ray images: the original COVID-31 image, and images enhanced using HE, CLAHE, and a complement filter. A mask of the lungs is shown below. These are then multiplied to produce segmented lung regions, shown in the bottom row. The segmented lung regions correspond to the original and enhanced images from the top row.
+
+the training process, it was found that the size of 112 × 112 pixels expedited the training without affecting the performance metrics.

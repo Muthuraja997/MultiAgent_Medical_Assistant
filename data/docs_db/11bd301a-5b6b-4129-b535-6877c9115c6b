@@ -1,0 +1,33 @@
+## Preprocessing
+
+The purpose of the pre-processing phase is to prepare the X-ray images for classification using CNN pre-trained models. In this phase, different pre-processing steps are applied to improve the performance of the classification. The pre-processing steps can be summarized as follows:
+
+Table 1. COVID-19 radiography database distribution.
+
+| Classes         | Normal   |   Positive COVID-19 |   Viral pneumonia |   Lung opacity |
+|-----------------|----------|---------------------|-------------------|----------------|
+| Number of cases | 10,192   |                3616 |              1345 |           6012 |
+
+picture_counter_1 The image shows a chest X-ray.
+
+Normal-3
+
+picture_counter_2 The image shows a chest X-ray with visible abnormalities in the lungs.
+
+COVID-31
+
+picture_counter_3 Chest X-ray image showing lung abnormalities. Specifically, there appears to be consolidation or opacity in the right lung field. The left lung field seems relatively clear. The image shows the ribs, clavicles, and other anatomical structures of the chest.
+
+Viral Pneumonia-13
+
+Lung\_Opacity-7
+
+picture_counter_4 The image shows a chest X-ray with visible medical tubing and devices attached to the patient. The lungs and other internal structures are visible in the X-ray. There appears to be some opacity or abnormality in the lower right lung field.
+
+Figure 1. Samples from COVID-19 radiography chest database representing different classes.
+
+Vol.:(0123456789)
+
+<!-- page_break -->
+
+Vol:.(1234567890)

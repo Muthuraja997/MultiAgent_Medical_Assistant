@@ -1,0 +1,3 @@
+## Deep learning
+
+Deep learning is a subset of machine learning that focuses on training artificial neural networks to perform complex tasks by learning patterns and representations directly from data. Unlike traditional machine learning approaches that require manual feature engineering, deep learning algorithms autonomously extract hierarchical features from data, leading to the creation of powerful and highly accurate   models 18-20 . In this study, a CNN architecture is employed.

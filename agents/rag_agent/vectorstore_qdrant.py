@@ -40,9 +40,15 @@ class VectorStore:
             self.logger.error(f"Error checking for collection existence: {e}")
             return False
 
-    def _create_collection(self):
+    def _create_collection(self, force_recreate: bool = False):
         """Create a new collection with dense and sparse vectors."""
         try:
+            # If force_recreate is True, delete the existing collection first
+            if force_recreate and self._does_collection_exist():
+                self.logger.info(f"Force recreating collection: {self.collection_name}")
+                self.client.delete_collection(collection_name=self.collection_name)
+                self.logger.info(f"Deleted existing collection: {self.collection_name}")
+            
             self.client.create_collection(
                 collection_name=self.collection_name,
                 vectors_config={"dense": VectorParams(size=self.embedding_dim, distance=Distance.COSINE)},
@@ -91,6 +97,7 @@ class VectorStore:
             self,
             document_chunks: List[str],
             document_path: str,
+            force_recreate: bool = False,
         ) -> Tuple[QdrantVectorStore, LocalFileStore, List[str]]:
         """
         Create a vector store from document chunks or upsert documents to existing store.
@@ -98,6 +105,7 @@ class VectorStore:
         Args:
             document_chunks: List of document chunks
             document_path: Path to the original document
+            force_recreate: If True, recreate the collection with correct dimensions
             
         Returns:
             Tuple containing (vectorstore, docstore, doc_ids)
@@ -127,10 +135,14 @@ class VectorStore:
         # Check if collection exists, create if it doesn't
         collection_exists = self._does_collection_exist()
         if not collection_exists:
-            self._create_collection()
+            self._create_collection(force_recreate=False)
             self.logger.info(f"Created new collection: {self.collection_name}")
         else:
-            self.logger.info(f"Collection {self.collection_name} already exists, will upsert documents")
+            if force_recreate:
+                self.logger.info(f"Force recreating collection with correct dimensions")
+                self._create_collection(force_recreate=True)
+            else:
+                self.logger.info(f"Collection {self.collection_name} already exists, will upsert documents")
         
         # Initialize vector store
         qdrant_vectorstore = QdrantVectorStore(
@@ -152,6 +164,9 @@ class VectorStore:
         # Encode string chunks to bytes before storing
         encoded_chunks = [chunk.encode('utf-8') for chunk in document_chunks]
         docstore.mset(list(zip(doc_ids, encoded_chunks)))
+        
+        # Return the vectorstore and docstore
+        return qdrant_vectorstore, docstore, doc_ids
 
     def retrieve_relevant_chunks(
             self,

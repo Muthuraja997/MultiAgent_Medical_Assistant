@@ -1,0 +1,5 @@
+## Transfer learning
+
+Transfer learning stands as a fundamental concept within both machine learning and deep learning, involving the utilization of knowledge garnered from training a model on a particular task and subsequently applying that knowledge to another related task. In the realm of neural networks, transfer learning manifests significant potency. It encompasses the process of employing a pre-trained model, typically trained on a comprehensive and varied dataset, and fine-tuning it on a fresh dataset or task 21-23 .
+
+In this study, transfer learning models InceptionV3, VGG16, VGG19, and EfficientNetB4 were used in the classification process.

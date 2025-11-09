@@ -1,0 +1,11 @@
+## VGG19 model
+
+VGG19 is a variant of the VGG CNN model which was created by Visual Geometry Group (VGG) at Oxford University. VGG19 was one of the winners of the Image Net Large Scale Visual Recognition Challenge (ILSVRC) in 2014. The size of the input image to VGG19 is (224 × 224). VGG19 contains 16 convolution layers, 5 maxpooling layers and 3 fully connected layers. The convolution layers are with (3 × 3) filters' size, stride of 1 pixel and padding of 1 pixel. The max-pooling layers are with a size of 2 × 2 and a stride of 2. The rectification (ReLU)
+
+Vol.:(0123456789)
+
+<!-- page_break -->
+
+Vol:.(1234567890)
+
+activation function is utilized for all hidden layers. Then, the first 2 fully connected layers with 4096 channels each are uitilized followed by the last layer of 1000 channels to represent the different 1000 classes of the ImageNet with soft-max activation   function 15 .

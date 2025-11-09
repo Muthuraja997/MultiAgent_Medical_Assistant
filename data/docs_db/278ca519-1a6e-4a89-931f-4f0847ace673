@@ -1,0 +1,9 @@
+## Image enhancement
+
+Enhancing images is a significant step for the correct classification. It increases image contrast in order to improve classification performance. Different techniques can be applied to enhance the images. In this research, some of these techniques have been applied to the original X-ray images before introducing them to the classification models, they are as follows:
+
+1. Histogram Equalization (HE): The purpose of histogram equalization (HE) is to spread the gray levels inside the image. It modifies the brightness and contrast of the images to improve the image   quality 27 . The original X-ray images' intensity has been enhanced using histogram equalization (HE).
+2. Contrast Limited Adaptive Histogram Equalization (CLAHE): It originated from Global Histogram Equalization (GHE), it is based on dividing the image into non-overlapping blocks, and after that, the histogram of each block is gotten using a pre-specified   value 28 . In this research, CLAHE has been used to enhance the contrast of original X-ray images.
+3. Image Complement: The complement or inverse of X-ray images transforms the dark positions to lighter and the light positions to darker. As this is a standard process, which is similar to that used by radiologists, it may aid a deep learning model for improving classification performance. The complement of the binary image can be obtained by changing the zeros to ones and ones to zeros. Whereas for a grayscale image, each pixel is subtracted from 255.
+
+Figure 2 shows an original X-ray image and its enhanced versions after applying HE, CLAHE and image complement on the original image with the corresponding histogram plots for each version.

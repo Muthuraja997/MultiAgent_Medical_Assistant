@@ -1,0 +1,37 @@
+## Limitation
+
+With our motivation to investigate how it will work in single CNN and multilayer CNN based transfer learning models, we subjected the dataset to classification as it is without rotation and cropping operations, which is the most important limitation of our study.
+
+Vol.:(0123456789)
+
+<!-- page_break -->
+
+Vol:.(1234567890)
+
+Figure 5. The confusion metrics of ( a ) CNN model, ( b ) EfficientNetB4 model, ( c ) VGG19 model ( d ) InceptionV3 model, ( e ) VGG16.
+
+picture_counter_5 The image displays five confusion matrices, each representing the performance of a different AI model in classifying brain tumors. The models are: (a) CNN, (b) EfficientNetB4, (c) VGG19, (d) InceptionV3, and (e) VGG16. Each matrix shows the AI Prediction against the Doctor Diagnosis for four categories: glioma tumor, meningioma tumor, no tumor, and pituitary tumor. The color intensity in each cell represents the number of instances predicted for each combination, with darker shades indicating higher counts.
+
+Table 4. Comparison with previous studies on brain tumor. Best results obtained in the study.
+
+| Authors                 | Dataset                          | Models                                     | Accuracy (%)                        |
+|-------------------------|----------------------------------|--------------------------------------------|-------------------------------------|
+| Wallis and Buvat 1      | Brain Tumor Dataset 28           | SVM                                        | 74                                  |
+| Seere and Karibasappa 2 | Their own Brain Tumor dataset    | SVM                                        | 85.32                               |
+| Ortiz-Ramón et al. 3    | Their own Brain Tumor dataset    | SVM                                        | 89.6                                |
+| Gupta and Sasidhar 4    | MICCAI 2012 Challenge database 4 | SVM                                        | 87                                  |
+| Gumaei et al. 5         | Brain Tumor Dataset 28           | RELM                                       | 92.61                               |
+| Shahajad et al. 6       | Kaggle brain dataset 17          | SVM                                        | 92                                  |
+| Vankdothu et al. 7      | Brain Tumor Dataset 17           | CNN, LSTM CNN-LSTM                         | CNN89 LSTM 90.02 CNN-LSTM 92        |
+| Sirinivas et al. 8      | Brain Tumor Dataset 17           | InceptionV3 VGG16 ResNET50                 | InceptionV3 78 VGG16 96 ResNET50 95 |
+| Choudhury et al. 9      | Their own Brain Tumor dataset    | CNN                                        | 96.08                               |
+| Martini and Oermann 10  | Their own Brain Tumor dataset    | CNN                                        | 93.09                               |
+| Sarkar et al. 11        | Their own Brain Tumor dataset    | CNN                                        | 91.03                               |
+| Arunkumar et al. 12     | None                             | SVM,KNN                                    | 92.14                               |
+| Zacharaki et al. 13     | Their own Brain Tumor dataset    | SVM,KNN                                    | 88                                  |
+| Cheng et al. 14         | Their own Brain Tumor dataset    | SVM,KNN                                    | 91.28                               |
+| Paul et al. 15          | Their own Brain Tumor dataset    | CNN                                        | 91.43                               |
+| Afshar et al. 16        | Brain Tumor Dataset 28           | CapsNet                                    | 90.89                               |
+| This study              | Brain Tumor Dataset 17           | EfficientNetB4 InceptionV3 VGG19 VGG16 CNN | 97 95 96 98 91                      |
+
+<!-- page_break -->

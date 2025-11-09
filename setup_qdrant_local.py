@@ -20,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).parent))
 
 from config import Config
 from qdrant_client import QdrantClient
+from agents.rag_agent import MedicalRAG
 
 # Configure logging
 logging.basicConfig(

@@ -81,11 +81,13 @@ class MedicalRAG:
             failed_files = []
             
             # Process each file
-            for file_path in files:
-                self.logger.info(f"Processing file {successful_ingestions + failed_ingestions + 1}/{len(files)}: {file_path}")
+            for file_idx, file_path in enumerate(files):
+                self.logger.info(f"Processing file {file_idx + 1}/{len(files)}: {file_path}")
                 
                 try:
-                    result = self.ingest_file(file_path)
+                    # Force recreate collection on first file to fix dimension mismatch
+                    force_recreate = (file_idx == 0)
+                    result = self.ingest_file(file_path, force_recreate=force_recreate)
                     if result["success"]:
                         successful_ingestions += 1
                         total_chunks_processed += result.get("chunks_processed", 0)
@@ -114,12 +116,13 @@ class MedicalRAG:
                 "processing_time": time.time() - start_time
             }
     
-    def ingest_file(self, document_path: str) -> Dict[str, Any]:
+    def ingest_file(self, document_path: str, force_recreate: bool = False) -> Dict[str, Any]:
         """
         Ingest a single file into the RAG system.
         
         Args:
             document_path: Path to the file to ingest
+            force_recreate: If True, recreate the collection before ingesting (fixes dimension mismatch)
             
         Returns:
             Dictionary with ingestion results
@@ -151,7 +154,8 @@ class MedicalRAG:
             self.logger.info("5. Creating vector store knowledge base...")
             self.vector_store.create_vectorstore(
                 document_chunks=document_chunks, 
-                document_path=document_path
+                document_path=document_path,
+                force_recreate=force_recreate
                 )
             
             return {
