@@ -22,7 +22,7 @@ Your Multi-Agent Medical Assistant project now has **complete setup and API docu
    - Option A: Cloud Setup (Azure OpenAI)
    - Option B: Open-Source Setup (Ollama)
    - Option C: Hybrid Setup
-   - Docker and GPU acceleration
+   - GPU acceleration for local models
 
 4. **DOCUMENTATION_INDEX.md** (8 KB) - Navigation hub
    - Quick links to all docs
@@ -289,10 +289,9 @@ Steps:
 - [ ] Test with real data
 
 ### Week 4: Deploy It (Optional)
-- [ ] Read SETUP_GUIDE.md Docker section
 - [ ] Set up for production
 - [ ] Configure monitoring
-- [ ] Deploy to cloud
+- [ ] Deploy to cloud or VPS
 
 ---
 

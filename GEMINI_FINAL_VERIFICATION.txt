@@ -184,7 +184,7 @@ Security:
 ⚙️ ENVIRONMENT CONFIGURATION
 
 Required Variables:
-  GOOGLE_API_KEY=AIzaSyBAcf3_qoAw8X7xVHBhbCfBd42DQ72u5w8
+  GOOGLE_API_KEY=your-gemini-api-key-here
   QDRANT_URL=http://localhost:6333
   QDRANT_API_KEY=                    # Empty for local
 

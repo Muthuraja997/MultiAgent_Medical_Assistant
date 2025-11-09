@@ -21,7 +21,7 @@
 ### One-Line Setup (All 3 Paths)
 ```bash
 # Clone, setup, and run all at once
-git clone https://github.com/souvikmajumder26/Multi-Agent-Medical-Assistant.git && \
+git clone https://github.com/Muthuraja997/Multi-Agent-Medical-Assistant.git && \
 cd Multi-Agent-Medical-Assistant && \
 chmod +x setup.sh && \
 ./setup.sh
@@ -31,7 +31,7 @@ chmod +x setup.sh && \
 
 **Step 1: Clone Repository**
 ```bash
-git clone https://github.com/souvikmajumder26/Multi-Agent-Medical-Assistant.git
+git clone https://github.com/Muthuraja997/Multi-Agent-Medical-Assistant.git
 cd Multi-Agent-Medical-Assistant
 ```
 
@@ -277,10 +277,9 @@ Total:                                      $15/month
 - [ ] Test custom RAG queries (20 min)
 
 ### Week 4: Deploy It
-- [ ] Read SETUP_GUIDE.md Docker section (15 min)
-- [ ] Build Docker image (10 min)
-- [ ] Set up for production (30 min)
-- [ ] Monitor costs/performance (20 min)
+- [ ] Deploy to production server/VPS (30 min)
+- [ ] Configure monitoring and logging (30 min)
+- [ ] Set up CI/CD pipeline (1 hour)
 
 ---
 
@@ -298,9 +297,9 @@ Total:                                      $15/month
 - Git: https://git-scm.com/
 
 ### Project Resources
-- GitHub: https://github.com/souvikmajumder26/Multi-Agent-Medical-Assistant
-- Issues: https://github.com/souvikmajumder26/Multi-Agent-Medical-Assistant/issues
-- Discussions: https://github.com/souvikmajumder26/Multi-Agent-Medical-Assistant/discussions
+- GitHub: https://github.com/Muthuraja997/Multi-Agent-Medical-Assistant
+- Issues: https://github.com/Muthuraja997/Multi-Agent-Medical-Assistant/issues
+- Discussions: https://github.com/Muthuraja997/Multi-Agent-Medical-Assistant/discussions
 
 ### Technical Docs
 - LangChain: https://python.langchain.com/

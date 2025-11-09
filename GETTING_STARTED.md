@@ -61,7 +61,7 @@ python app.py
 ### New Documentation Files
 | File | Purpose | Size |
 |------|---------|------|
-| **SETUP_GUIDE.md** | 🔧 Detailed setup with 4 options (Cloud/Open-Source/Hybrid/Docker) | 14 KB |
+| **SETUP_GUIDE.md** | 🔧 Detailed setup with 3 options (Cloud/Open-Source/Hybrid) | 14 KB |
 | **API_REQUIREMENTS.md** | 📋 API costs, requirements, comparisons, troubleshooting | 8 KB |
 | **.env.example** | 🔑 Template for all environment variables | 7 KB |
 | **setup.sh** | 🚀 Interactive setup script (automated) | 13 KB |
@@ -223,7 +223,7 @@ uname -m  # Should show: arm64
 ### Step 2: Get This Project
 ```bash
 # Clone if you don't have it
-git clone https://github.com/souvikmajumder26/Multi-Agent-Medical-Assistant.git
+git clone https://github.com/Muthuraja997/Multi-Agent-Medical-Assistant.git
 cd Multi-Agent-Medical-Assistant
 ```
 
@@ -430,7 +430,7 @@ After setup works, learn more:
 - **Tavily**: https://tavily.com/
 - **ElevenLabs**: https://elevenlabs.io/
 - **Qdrant**: https://qdrant.tech/
-- **Project**: https://github.com/souvikmajumder26/Multi-Agent-Medical-Assistant
+- **Project**: https://github.com/Muthuraja997/Multi-Agent-Medical-Assistant
 
 ---
 

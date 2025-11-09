@@ -35,7 +35,6 @@ Comprehensive detailed guide for each option.
 - Option A: Cloud Setup (Azure OpenAI)
 - Option B: Open-Source Setup (Ollama)
 - Option C: Hybrid Setup (Recommended)
-- Docker configuration
 - GPU acceleration setup
 - Testing procedures
 
@@ -371,7 +370,7 @@ HYBRID PATH:
 ### Install & Run
 ```bash
 # Clone
-git clone https://github.com/souvikmajumder26/Multi-Agent-Medical-Assistant.git
+git clone https://github.com/Muthuraja997/Multi-Agent-Medical-Assistant.git
 cd Multi-Agent-Medical-Assistant
 
 # Setup (interactive)

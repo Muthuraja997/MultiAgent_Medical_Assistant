@@ -39,7 +39,6 @@ You now have a **complete, production-ready setup guide** for the Multi-Agent Me
 - Option A: Cloud Setup (Azure OpenAI)
 - Option B: Open-Source Setup (Ollama)
 - Option C: Hybrid Setup (Recommended)
-- Docker configuration
 - GPU acceleration setup
 - Testing procedures
 
@@ -341,7 +340,7 @@ python app.py
 
 ```bash
 # All-in-one for Cloud setup
-git clone https://github.com/souvikmajumder26/Multi-Agent-Medical-Assistant.git && cd Multi-Agent-Medical-Assistant && chmod +x setup.sh && ./setup.sh
+git clone https://github.com/Muthuraja997/Multi-Agent-Medical-Assistant.git && cd Multi-Agent-Medical-Assistant && chmod +x setup.sh && ./setup.sh
 ```
 
 ---
@@ -387,7 +386,7 @@ git clone https://github.com/souvikmajumder26/Multi-Agent-Medical-Assistant.git 
 ✅ **Understand every component** (all documentation)
 ✅ **Contribute code confidently** (copilot-instructions.md)
 ✅ **Troubleshoot issues** (multiple guides)
-✅ **Scale to production** (Docker in SETUP_GUIDE.md)
+✅ **Scale to production** (deploy to VPS/cloud)
 
 ---
 

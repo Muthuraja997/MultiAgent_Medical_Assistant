@@ -14,7 +14,7 @@ DefaultCredentialsError: Your default credentials were not found
 
 **File Created:** `.env`
 ```bash
-GOOGLE_API_KEY=AIzaSyBAcf3_qoAw8X7xVHBhbCfBd42DQ72u5w8
+GOOGLE_API_KEY=your-gemini-api-key-here
 QDRANT_URL=http://localhost:6333
 ```
 
@@ -124,7 +124,7 @@ curl -X POST http://localhost:8000/chat \
 ```bash
 cat .env
 # Should show:
-# GOOGLE_API_KEY=AIzaSyBAcf3_qoAw8X7xVHBhbCfBd42DQ72u5w8
+# GOOGLE_API_KEY=your-gemini-api-key-here
 ```
 
 **Check 2: Restart app**

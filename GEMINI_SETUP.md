@@ -19,7 +19,7 @@
 3. Copy your API key
 4. Save it somewhere safe
 
-Your key: `AIzaSyBAcf3_qoAw8X7xVHBhbCfBd42DQ72u5w8`
+Your key: `PASTE-YOUR-GEMINI-API-KEY-HERE`
 
 ---
 
@@ -40,7 +40,7 @@ Create `.env` in project root:
 
 ```env
 # Google Gemini API
-GOOGLE_API_KEY=AIzaSyBAcf3_qoAw8X7xVHBhbCfBd42DQ72u5w8
+GOOGLE_API_KEY=your-gemini-api-key-here
 
 # Vector Database (local)
 QDRANT_HOST=localhost

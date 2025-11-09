@@ -221,8 +221,8 @@ Before starting, ensure you have:
 - Docs: https://github.com/jmorganca/ollama
 
 ### Project Repository
-- GitHub: https://github.com/souvikmajumder26/Multi-Agent-Medical-Assistant
-- Issues: https://github.com/souvikmajumder26/Multi-Agent-Medical-Assistant/issues
+- GitHub: https://github.com/Muthuraja997/Multi-Agent-Medical-Assistant
+- Issues: https://github.com/Muthuraja997/Multi-Agent-Medical-Assistant/issues
 
 ### Other Resources
 - LangChain: https://python.langchain.com/

@@ -111,7 +111,7 @@ What you need:
 ### Step 2: Clone & Setup (Same for All Paths)
 ```bash
 # Clone repo
-git clone https://github.com/souvikmajumder26/Multi-Agent-Medical-Assistant.git
+git clone https://github.com/Muthuraja997/Multi-Agent-Medical-Assistant.git
 cd Multi-Agent-Medical-Assistant
 
 # Create virtual environment

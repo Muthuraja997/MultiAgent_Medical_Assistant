@@ -135,7 +135,7 @@ Benefits:
 
 ```bash
 # Google Gemini API Configuration
-GOOGLE_API_KEY=AIzaSyBAcf3_qoAw8X7xVHBhbCfBd42DQ72u5w8
+GOOGLE_API_KEY=your-gemini-api-key-here
 
 # Qdrant Vector Database Configuration (Local)
 QDRANT_URL=http://localhost:6333

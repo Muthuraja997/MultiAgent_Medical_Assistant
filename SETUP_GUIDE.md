@@ -22,7 +22,7 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/souvikmajumder26/Multi-Agent-Medical-Assistant.git
+git clone https://github.com/Muthuraja997/Multi-Agent-Medical-Assistant.git
 cd Multi-Agent-Medical-Assistant
 
 # Create virtual environment
@@ -373,40 +373,6 @@ pip install torch torchvision torchaudio
 
 # Test GPU
 python -c "import torch; print(torch.cuda.is_available())"
-```
-
----
-
-## 🐳 Docker Setup (All Options)
-
-### Cloud Setup with Docker
-
-```bash
-# Build image
-docker build -t medical-assistant:cloud .
-
-# Run with cloud API keys
-docker run -e deployment_name=... -e openai_api_key=... \
-           -p 8000:8000 medical-assistant:cloud
-```
-
-### Open-Source Setup with Docker
-
-```dockerfile
-# Modify Dockerfile
-FROM python:3.11-slim
-
-WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY . .
-
-# Expose ports
-EXPOSE 8000 11434
-
-# Start both Ollama and FastAPI
-CMD ["sh", "-c", "ollama serve & sleep 5 && python app.py"]
 ```
 
 ---
