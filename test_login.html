@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Login Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 500px;
+            margin: 50px auto;
+            padding: 20px;
+        }
+        .form-group {
+            margin: 15px 0;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input, select {
+            width: 100%;
+            padding: 8px;
+            font-size: 14px;
+        }
+        button {
+            padding: 10px 20px;
+            background: #007bff;
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background: #0056b3;
+        }
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            border-radius: 5px;
+        }
+        .success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>Login Test Page</h1>
+    
+    <div class="form-group">
+        <label>User Type:</label>
+        <select id="user_type">
+            <option value="USER">USER</option>
+            <option value="DOCTOR">DOCTOR</option>
+        </select>
+    </div>
+    
+    <div class="form-group">
+        <label>User ID:</label>
+        <input type="text" id="user_id" value="user_001">
+    </div>
+    
+    <div class="form-group">
+        <label>Password:</label>
+        <input type="password" id="password" value="password123">
+    </div>
+    
+    <button onclick="testLogin()">Test Login</button>
+    
+    <div id="result"></div>
+    
+    <script>
+        async function testLogin() {
+            const resultDiv = document.getElementById('result');
+            resultDiv.innerHTML = 'Testing login...';
+            resultDiv.className = '';
+            
+            const user_id = document.getElementById('user_id').value;
+            const password = document.getElementById('password').value;
+            const user_type = document.getElementById('user_type').value;
+            
+            try {
+                const response = await fetch('http://localhost:8000/api/login', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        user_id: user_id,
+                        password: password,
+                        user_type: user_type
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    resultDiv.className = 'success';
+                    resultDiv.innerHTML = `
+                        <strong>✅ Login Successful!</strong><br>
+                        <strong>User ID:</strong> ${data.user_id}<br>
+                        <strong>Name:</strong> ${data.user_name}<br>
+                        <strong>Type:</strong> ${data.user_type}<br>
+                        <strong>Token:</strong> ${data.token.substring(0, 20)}...
+                    `;
+                } else {
+                    resultDiv.className = 'error';
+                    resultDiv.innerHTML = `
+                        <strong>❌ Login Failed</strong><br>
+                        ${data.message}
+                    `;
+                }
+            } catch (error) {
+                resultDiv.className = 'error';
+                resultDiv.innerHTML = `
+                    <strong>❌ Connection Error</strong><br>
+                    ${error.message}<br>
+                    <small>Make sure backend is running on port 8000</small>
+                `;
+            }
+        }
+    </script>
+    
+    <h3>Test Credentials:</h3>
+    <p><strong>Users:</strong></p>
+    <ul>
+        <li>user_001 / password123</li>
+        <li>user_002 / password123</li>
+        <li>user_003 / password123</li>
+    </ul>
+    <p><strong>Doctors:</strong></p>
+    <ul>
+        <li>doc_001 / doctor123</li>
+        <li>doc_002 / doctor123</li>
+        <li>doc_003 / doctor123</li>
+    </ul>
+</body>
+</html>
