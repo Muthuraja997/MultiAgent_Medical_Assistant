@@ -1,134 +1,192 @@
 import { useState, useEffect } from 'react';
-import { Video, Calendar, Clock, Copy, Check, ExternalLink, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
+import {
+  Video,
+  Calendar,
+  Clock,
+  User,
+  CheckCircle,
+  XCircle,
+  AlertCircle,
+  Loader,
+  RefreshCw,
+} from 'lucide-react';
 
-interface Meeting {
-  id: string;
-  roomName: string;
-  doctorName: string;
-  patientName: string;
-  scheduledTime: string;
-  status: 'scheduled' | 'active' | 'completed';
-  duration?: number;
+interface AppointmentRequest {
+  request_id: string;
+  user_id: string;
+  user_name: string;
+  doctor_id: string;
+  doctor_name: string;
+  reason: string;
+  preferred_date: string;
+  preferred_time: string;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
+  meet_link?: string;
+  created_at: string;
 }
 
 const VideoConsultation = () => {
-  const [meetings, setMeetings] = useState<Meeting[]>([]);
-  const [activeMeeting, setActiveMeeting] = useState<Meeting | null>(null);
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [copiedLink, setCopiedLink] = useState(false);
-  const [newMeeting, setNewMeeting] = useState({
-    doctorName: '',
-    patientName: '',
-    scheduledTime: '',
-  });
+  const [appointmentRequests, setAppointmentRequests] = useState<AppointmentRequest[]>([]);
+  const [userRequests, setUserRequests] = useState<AppointmentRequest[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [processing, setProcessing] = useState<string | null>(null);
+  const [message, setMessage] = useState({ type: '', text: '' });
+  const [refreshing, setRefreshing] = useState(false);
 
-  // Load Jitsi API script
+  const userId = localStorage.getItem('user_id');
+  const userType = localStorage.getItem('user_type');
+
   useEffect(() => {
-    const script = document.createElement('script');
-    script.src = 'https://meet.jit.si/external_api.js';
-    script.async = true;
-    document.head.appendChild(script);
+    fetchAppointmentRequests();
+    const interval = setInterval(() => {
+      fetchAppointmentRequests(true);
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [userId, userType]);
 
-    return () => {
-      document.head.removeChild(script);
-    };
-  }, []);
-
-  // Load saved meetings from localStorage
-  useEffect(() => {
-    const savedMeetings = localStorage.getItem('medicalMeetings');
-    if (savedMeetings) {
-      setMeetings(JSON.parse(savedMeetings));
+  const fetchAppointmentRequests = async (silent = false) => {
+    if (!silent) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
     }
-  }, []);
 
-  // Save meetings to localStorage
-  const saveMeetings = (updatedMeetings: Meeting[]) => {
-    setMeetings(updatedMeetings);
-    localStorage.setItem('medicalMeetings', JSON.stringify(updatedMeetings));
+    try {
+      if (userType === 'DOCTOR') {
+        const response = await fetch(`/api/appointment-requests/doctor/${userId}`);
+        const data = await response.json();
+        setAppointmentRequests(data);
+      } else if (userType === 'USER') {
+        const response = await fetch(`/api/appointment-requests/user/${userId}`);
+        const data = await response.json();
+        setUserRequests(data);
+      }
+    } catch (error) {
+      console.error('Error fetching appointment requests:', error);
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
   };
 
-  // Generate unique room name
-  const generateRoomName = () => {
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 8);
-    return `medical-consult-${timestamp}-${random}`;
+  const handleAccept = (request: AppointmentRequest) => {
+    if (!window.confirm(`Accept appointment request from ${request.user_name}?\n\nA Jitsi meeting link will be automatically created.`)) {
+      return;
+    }
+    
+    confirmAccept(request);
   };
 
-  // Create new meeting
-  const createMeeting = () => {
-    if (!newMeeting.doctorName || !newMeeting.patientName || !newMeeting.scheduledTime) {
-      alert('Please fill in all fields');
+  const confirmAccept = async (request: AppointmentRequest) => {
+    setProcessing(request.request_id);
+    setMessage({ type: '', text: '' });
+
+    try {
+      const response = await fetch(`/api/appointment-requests/${request.request_id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: 'ACCEPTED',
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setMessage({ 
+          type: 'success', 
+          text: `Appointment accepted! Meeting link: ${data.meet_link || 'Generated'}` 
+        });
+        setTimeout(() => {
+          fetchAppointmentRequests();
+          setMessage({ type: '', text: '' });
+        }, 3000);
+      } else {
+        const data = await response.json();
+        setMessage({ type: 'error', text: data.detail || 'Failed to accept appointment' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Connection error. Please try again.' });
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleReject = async (request: AppointmentRequest) => {
+    if (!window.confirm(`Are you sure you want to reject this appointment request from ${request.user_name}?`)) {
       return;
     }
 
-    const meeting: Meeting = {
-      id: Date.now().toString(),
-      roomName: generateRoomName(),
-      doctorName: newMeeting.doctorName,
-      patientName: newMeeting.patientName,
-      scheduledTime: newMeeting.scheduledTime,
-      status: 'scheduled',
-    };
+    setProcessing(request.request_id);
 
-    saveMeetings([...meetings, meeting]);
-    setShowCreateModal(false);
-    setNewMeeting({ doctorName: '', patientName: '', scheduledTime: '' });
-  };
+    try {
+      const response = await fetch(`/api/appointment-requests/${request.request_id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          status: 'REJECTED',
+        }),
+      });
 
-  // Start instant meeting
-  const startInstantMeeting = () => {
-    const meeting: Meeting = {
-      id: Date.now().toString(),
-      roomName: generateRoomName(),
-      doctorName: 'Doctor',
-      patientName: 'Patient',
-      scheduledTime: new Date().toISOString(),
-      status: 'active',
-    };
-
-    saveMeetings([...meetings, meeting]);
-    setActiveMeeting(meeting);
-  };
-
-  // Join meeting
-  const joinMeeting = (meeting: Meeting) => {
-    const updatedMeetings = meetings.map(m =>
-      m.id === meeting.id ? { ...m, status: 'active' as const } : m
-    );
-    saveMeetings(updatedMeetings);
-    setActiveMeeting({ ...meeting, status: 'active' });
-  };
-
-  // End meeting
-  const endMeeting = () => {
-    if (activeMeeting) {
-      const updatedMeetings = meetings.map(m =>
-        m.id === activeMeeting.id ? { ...m, status: 'completed' as const } : m
-      );
-      saveMeetings(updatedMeetings);
+      if (response.ok) {
+        setMessage({ type: 'success', text: 'Appointment rejected' });
+        setTimeout(() => {
+          fetchAppointmentRequests();
+          setMessage({ type: '', text: '' });
+        }, 1500);
+      } else {
+        const data = await response.json();
+        setMessage({ type: 'error', text: data.detail || 'Failed to reject appointment' });
+      }
+    } catch (error) {
+      setMessage({ type: 'error', text: 'Connection error. Please try again.' });
+    } finally {
+      setProcessing(null);
     }
-    setActiveMeeting(null);
   };
 
-  // Copy meeting link
-  const copyMeetingLink = (roomName: string) => {
-    const link = `https://meet.jit.si/${roomName}`;
-    navigator.clipboard.writeText(link);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 2000);
+  const getStatusBadge = (status: string) => {
+    const badges = {
+      PENDING: {
+        color: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+        icon: <AlertCircle className="w-4 h-4" />,
+      },
+      ACCEPTED: {
+        color: 'bg-green-100 text-green-800 border-green-300',
+        icon: <CheckCircle className="w-4 h-4" />,
+      },
+      REJECTED: {
+        color: 'bg-red-100 text-red-800 border-red-300',
+        icon: <XCircle className="w-4 h-4" />,
+      },
+    };
+
+    const badge = badges[status as keyof typeof badges];
+    return (
+      <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium border ${badge.color}`}>
+        {badge.icon}
+        <span className="ml-2">{status}</span>
+      </span>
+    );
   };
 
-  // Get meeting link
-  const getMeetingLink = (roomName: string) => {
-    return `https://meet.jit.si/${roomName}`;
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
   };
 
-  // Format date/time
-  const formatDateTime = (isoString: string) => {
-    const date = new Date(isoString);
+  const formatDateTime = (dateString: string) => {
+    const date = new Date(dateString);
     return date.toLocaleString('en-US', {
+      year: 'numeric',
       month: 'short',
       day: 'numeric',
       hour: '2-digit',
@@ -136,332 +194,294 @@ const VideoConsultation = () => {
     });
   };
 
-  // Delete meeting
-  const deleteMeeting = (meetingId: string) => {
-    const updatedMeetings = meetings.filter(m => m.id !== meetingId);
-    saveMeetings(updatedMeetings);
-  };
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-96">
+        <Loader className="w-8 h-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
+  if (userType === 'DOCTOR') {
+    const pendingRequests = appointmentRequests.filter(req => req.status === 'PENDING');
+    const acceptedRequests = appointmentRequests.filter(req => req.status === 'ACCEPTED');
+
+    return (
+      <div className="space-y-6">
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-3xl font-bold text-gray-800 mb-2">Appointment Requests</h1>
+              <p className="text-gray-600">Manage your patient appointments</p>
+            </div>
+            <button
+              onClick={() => fetchAppointmentRequests()}
+              disabled={refreshing}
+              className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all disabled:opacity-50"
+            >
+              <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+              <span>Refresh</span>
+            </button>
+          </div>
+        </div>
+
+        {message.text && (
+          <motion.div
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className={`p-4 rounded-lg ${
+              message.type === 'success'
+                ? 'bg-green-50 text-green-700 border border-green-200'
+                : 'bg-red-50 text-red-700 border border-red-200'
+            }`}
+          >
+            {message.text}
+          </motion.div>
+        )}
+
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+            <AlertCircle className="w-6 h-6 text-yellow-600 mr-2" />
+            Pending Requests ({pendingRequests.length})
+          </h2>
+
+          {pendingRequests.length === 0 ? (
+            <div className="text-center py-12">
+              <AlertCircle className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+              <p className="text-gray-500">No pending appointment requests</p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {pendingRequests.map((request) => (
+                <motion.div
+                  key={request.request_id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-all"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center mb-2">
+                        <User className="w-5 h-5 text-blue-600 mr-2" />
+                        <h3 className="text-lg font-semibold text-gray-800">{request.user_name}</h3>
+                        <span className="ml-3 text-sm text-gray-500">({request.user_id})</span>
+                      </div>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
+                        <div className="flex items-center text-gray-600">
+                          <Calendar className="w-4 h-4 mr-2" />
+                          <span className="text-sm">
+                            {request.preferred_date ? formatDate(request.preferred_date) : 'Not specified'}
+                          </span>
+                        </div>
+                        <div className="flex items-center text-gray-600">
+                          <Clock className="w-4 h-4 mr-2" />
+                          <span className="text-sm">{request.preferred_time || 'Not specified'}</span>
+                        </div>
+                      </div>
+
+                      <div className="bg-gray-50 rounded-lg p-3 mb-3">
+                        <p className="text-sm font-medium text-gray-700 mb-1">Reason:</p>
+                        <p className="text-sm text-gray-600">{request.reason || 'No reason provided'}</p>
+                      </div>
+
+                      <p className="text-xs text-gray-500">
+                        Requested: {formatDateTime(request.created_at)}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-col space-y-2 ml-4">
+                      <button
+                        onClick={() => handleAccept(request)}
+                        disabled={processing === request.request_id}
+                        className="flex items-center px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-all disabled:opacity-50"
+                      >
+                        {processing === request.request_id ? (
+                          <Loader className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>
+                            <CheckCircle className="w-4 h-4 mr-2" />
+                            Accept
+                          </>
+                        )}
+                      </button>
+                      <button
+                        onClick={() => handleReject(request)}
+                        disabled={processing === request.request_id}
+                        className="flex items-center px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-all disabled:opacity-50"
+                      >
+                        {processing === request.request_id ? (
+                          <Loader className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <>
+                            <XCircle className="w-4 h-4 mr-2" />
+                            Reject
+                          </>
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <h2 className="text-2xl font-bold text-gray-800 mb-4 flex items-center">
+            <CheckCircle className="w-6 h-6 text-green-600 mr-2" />
+            Accepted Appointments ({acceptedRequests.length})
+          </h2>
+
+          {acceptedRequests.length === 0 ? (
+            <div className="text-center py-8">
+              <p className="text-gray-500">No accepted appointments yet</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {acceptedRequests.map((request) => (
+                <motion.div
+                  key={request.request_id}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="border border-green-200 bg-green-50 rounded-lg p-4"
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <h3 className="font-semibold text-gray-800">{request.user_name}</h3>
+                    {getStatusBadge(request.status)}
+                  </div>
+                  <p className="text-sm text-gray-600 mb-2">{request.reason}</p>
+                  <div className="text-sm text-gray-600 mb-2">
+                    <Calendar className="w-4 h-4 inline mr-1" />
+                    {request.preferred_date ? formatDate(request.preferred_date) : 'Not specified'} at {request.preferred_time}
+                  </div>
+                  {request.meet_link && (
+                    <div className="mt-3 pt-3 border-t border-green-300">
+                      <a
+                        href={request.meet_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center w-full px-4 py-2 bg-green-600 text-white font-semibold rounded-lg hover:bg-green-700 transition-all shadow-md hover:shadow-lg"
+                      >
+                        <Video className="w-5 h-5 mr-2" />
+                        Join Video Consultation
+                      </a>
+                      <p className="text-xs text-gray-600 mt-2 text-center">
+                        Meeting room: {request.meet_link.split('/').pop()}
+                      </p>
+                    </div>
+                  )}
+                </motion.div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl p-6 text-white shadow-xl"
-      >
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-3xl font-bold mb-2">Video Consultation</h1>
-            <p className="text-blue-100">Connect with doctors via secure video calls</p>
-          </div>
-          <Video className="w-16 h-16 opacity-50" />
+      <div className="bg-white rounded-xl shadow-lg p-6">
+        <h1 className="text-3xl font-bold text-gray-800 mb-2">My Appointments</h1>
+        <p className="text-gray-600">View your appointment requests and their status</p>
+      </div>
+
+      {userRequests.length === 0 ? (
+        <div className="bg-white rounded-xl shadow-lg p-12 text-center">
+          <Calendar className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-gray-700 mb-2">No Appointments Yet</h2>
+          <p className="text-gray-500 mb-4">You haven't requested any appointments</p>
+          <a
+            href="/home"
+            className="inline-flex items-center px-6 py-3 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 transition-all"
+          >
+            Browse Doctors
+          </a>
         </div>
-      </motion.div>
-
-      {/* Active Meeting - Full Screen */}
-      <AnimatePresence>
-        {activeMeeting && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-50 bg-gray-900"
-          >
-            <div className="h-full flex flex-col">
-              {/* Meeting Header */}
-              <div className="bg-gray-800 px-6 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <div className="w-3 h-3 bg-red-500 rounded-full animate-pulse"></div>
-                    <span className="text-white font-medium">Live Consultation</span>
-                  </div>
-                  <div className="text-gray-300 text-sm">
-                    {activeMeeting.doctorName} • {activeMeeting.patientName}
-                  </div>
-                </div>
-                <button
-                  onClick={endMeeting}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
-                >
-                  <X className="w-5 h-5" />
-                  End Call
-                </button>
-              </div>
-
-              {/* Jitsi Meet Container */}
-              <div className="flex-1">
-                <iframe
-                  src={`https://meet.jit.si/${activeMeeting.roomName}?userInfo.displayName=${activeMeeting.patientName}`}
-                  allow="camera; microphone; fullscreen; display-capture"
-                  style={{ width: '100%', height: '100%', border: 'none' }}
-                  title="Video Consultation"
-                />
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      {/* Quick Actions */}
-      {!activeMeeting && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="grid grid-cols-1 md:grid-cols-2 gap-4"
-        >
-          <button
-            onClick={startInstantMeeting}
-            className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-blue-500 group"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Video className="w-8 h-8 text-white" />
-              </div>
-              <div className="text-left flex-1">
-                <h3 className="text-xl font-bold text-gray-900 mb-1">Start Instant Meeting</h3>
-                <p className="text-gray-600">Begin a consultation right now</p>
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => setShowCreateModal(true)}
-            className="bg-white rounded-xl shadow-lg p-6 hover:shadow-xl transition-all duration-300 border-2 border-transparent hover:border-green-500 group"
-          >
-            <div className="flex items-center gap-4">
-              <div className="w-16 h-16 bg-gradient-to-br from-green-500 to-teal-500 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform">
-                <Calendar className="w-8 h-8 text-white" />
-              </div>
-              <div className="text-left flex-1">
-                <h3 className="text-xl font-bold text-gray-900 mb-1">Schedule Meeting</h3>
-                <p className="text-gray-600">Plan a consultation for later</p>
-              </div>
-            </div>
-          </button>
-        </motion.div>
-      )}
-
-      {/* Meetings List */}
-      {!activeMeeting && meetings.length > 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-white rounded-xl shadow-lg p-6"
-        >
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">Your Consultations</h2>
-
-          <div className="space-y-4">
-            {meetings.map((meeting) => (
-              <motion.div
-                key={meeting.id}
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className={`p-4 border-2 rounded-xl transition-all duration-300 ${
-                  meeting.status === 'active'
-                    ? 'border-green-500 bg-green-50'
-                    : meeting.status === 'completed'
-                    ? 'border-gray-300 bg-gray-50'
-                    : 'border-blue-300 bg-blue-50 hover:border-blue-500'
-                }`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-3 mb-2">
-                      <span
-                        className={`px-3 py-1 rounded-full text-xs font-medium ${
-                          meeting.status === 'active'
-                            ? 'bg-green-500 text-white'
-                            : meeting.status === 'completed'
-                            ? 'bg-gray-500 text-white'
-                            : 'bg-blue-500 text-white'
-                        }`}
-                      >
-                        {meeting.status.charAt(0).toUpperCase() + meeting.status.slice(1)}
-                      </span>
-                      <h3 className="font-semibold text-gray-900">
-                        {meeting.doctorName} & {meeting.patientName}
-                      </h3>
-                    </div>
-
-                    <div className="space-y-1 text-sm text-gray-600 ml-0">
-                      <div className="flex items-center gap-2">
-                        <Clock className="w-4 h-4" />
-                        <span>{formatDateTime(meeting.scheduledTime)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <ExternalLink className="w-4 h-4" />
-                        <a
-                          href={getMeetingLink(meeting.roomName)}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-blue-600 hover:underline"
-                        >
-                          {getMeetingLink(meeting.roomName)}
-                        </a>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="flex gap-2">
-                    {meeting.status !== 'completed' && (
-                      <>
-                        <button
-                          onClick={() => copyMeetingLink(meeting.roomName)}
-                          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
-                          title="Copy meeting link"
-                        >
-                          {copiedLink ? (
-                            <Check className="w-4 h-4 text-green-600" />
-                          ) : (
-                            <Copy className="w-4 h-4" />
-                          )}
-                        </button>
-                        <button
-                          onClick={() => joinMeeting(meeting)}
-                          className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all duration-300 flex items-center gap-2"
-                        >
-                          <Video className="w-4 h-4" />
-                          Join
-                        </button>
-                      </>
-                    )}
-                    <button
-                      onClick={() => deleteMeeting(meeting.id)}
-                      className="px-3 py-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition-colors"
-                      title="Delete meeting"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </motion.div>
-      )}
-
-      {/* Empty State */}
-      {!activeMeeting && meetings.length === 0 && (
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-          className="bg-white rounded-xl shadow-lg p-12 text-center"
-        >
-          <Video className="w-20 h-20 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-xl font-bold text-gray-900 mb-2">No Consultations Yet</h3>
-          <p className="text-gray-600 mb-6">Start an instant meeting or schedule one for later</p>
-          <div className="flex gap-4 justify-center">
-            <button
-              onClick={startInstantMeeting}
-              className="px-6 py-3 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all duration-300"
-            >
-              Start Now
-            </button>
-            <button
-              onClick={() => setShowCreateModal(true)}
-              className="px-6 py-3 bg-white border-2 border-gray-300 text-gray-700 rounded-lg hover:border-gray-400 transition-colors"
-            >
-              Schedule
-            </button>
-          </div>
-        </motion.div>
-      )}
-
-      {/* Create Meeting Modal */}
-      <AnimatePresence>
-        {showCreateModal && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4"
-            onClick={() => setShowCreateModal(false)}
-          >
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {userRequests.map((request) => (
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6"
-              onClick={(e) => e.stopPropagation()}
+              key={request.request_id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-white rounded-xl shadow-lg p-6"
             >
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Schedule Consultation</h2>
-                <button
-                  onClick={() => setShowCreateModal(false)}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <X className="w-5 h-5" />
-                </button>
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h3 className="text-xl font-bold text-gray-800">{request.doctor_name}</h3>
+                  <p className="text-sm text-gray-500">{request.doctor_id}</p>
+                </div>
+                {getStatusBadge(request.status)}
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Doctor Name
-                  </label>
-                  <input
-                    type="text"
-                    value={newMeeting.doctorName}
-                    onChange={(e) =>
-                      setNewMeeting({ ...newMeeting, doctorName: e.target.value })
-                    }
-                    placeholder="Dr. Smith"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+              <div className="space-y-3 mb-4">
+                <div className="flex items-center text-gray-600">
+                  <Calendar className="w-5 h-5 mr-2" />
+                  <span>{request.preferred_date ? formatDate(request.preferred_date) : 'Not specified'}</span>
                 </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Patient Name
-                  </label>
-                  <input
-                    type="text"
-                    value={newMeeting.patientName}
-                    onChange={(e) =>
-                      setNewMeeting({ ...newMeeting, patientName: e.target.value })
-                    }
-                    placeholder="John Doe"
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Scheduled Time
-                  </label>
-                  <input
-                    type="datetime-local"
-                    value={newMeeting.scheduledTime}
-                    onChange={(e) =>
-                      setNewMeeting({ ...newMeeting, scheduledTime: e.target.value })
-                    }
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  />
+                <div className="flex items-center text-gray-600">
+                  <Clock className="w-5 h-5 mr-2" />
+                  <span>{request.preferred_time || 'Not specified'}</span>
                 </div>
               </div>
 
-              <div className="flex gap-3 mt-6">
-                <button
-                  onClick={() => setShowCreateModal(false)}
-                  className="flex-1 px-4 py-2 border-2 border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  onClick={createMeeting}
-                  className="flex-1 px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all duration-300"
-                >
-                  Create Meeting
-                </button>
+              <div className="bg-gray-50 rounded-lg p-3 mb-4">
+                <p className="text-sm font-medium text-gray-700 mb-1">Reason:</p>
+                <p className="text-sm text-gray-600">{request.reason || 'No reason provided'}</p>
               </div>
+
+              {request.status === 'ACCEPTED' && request.meet_link && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <span className="text-sm font-semibold text-green-800">✓ Appointment Confirmed</span>
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  </div>
+                  <a
+                    href={request.meet_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center justify-center w-full py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+                  >
+                    <Video className="w-5 h-5 mr-2" />
+                    Join Video Consultation
+                  </a>
+                  <p className="text-xs text-gray-600 mt-2 text-center">
+                    Room: {request.meet_link.split('/').pop()}
+                  </p>
+                </div>
+              )}
+
+              {request.status === 'PENDING' && (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+                  <div className="flex items-center">
+                    <AlertCircle className="w-5 h-5 text-yellow-600 mr-2" />
+                    <span className="text-sm text-yellow-800 font-medium">
+                      Waiting for doctor's confirmation
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {request.status === 'REJECTED' && (
+                <div className="bg-red-50 border border-red-200 rounded-lg p-3 mb-4">
+                  <div className="flex items-center">
+                    <XCircle className="w-5 h-5 text-red-600 mr-2" />
+                    <span className="text-sm text-red-800 font-medium">
+                      Appointment was not accepted
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              <p className="text-xs text-gray-500 mt-4">
+                Requested: {formatDateTime(request.created_at)}
+              </p>
             </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          ))}
+        </div>
+      )}
     </div>
   );
 };

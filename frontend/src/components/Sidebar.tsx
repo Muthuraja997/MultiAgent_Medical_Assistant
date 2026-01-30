@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Brain,
@@ -7,17 +7,34 @@ import {
   Activity,
   MapPin,
   Video,
+  Shield,
+  LogOut,
+  Home,
 } from 'lucide-react';
 
 const Sidebar = () => {
   const location = useLocation();
+  const navigate = useNavigate();
+  const userType = localStorage.getItem('user_type');
+  const userId = localStorage.getItem('user_id');
+  const isAdmin = userType === 'ADMIN' || userId === 'admin_001';
+
+  const handleLogout = () => {
+    localStorage.removeItem('user_id');
+    localStorage.removeItem('user_name');
+    localStorage.removeItem('user_type');
+    localStorage.removeItem('token');
+    navigate('/login');
+  };
 
   const menuItems = [
+    { path: '/home', icon: Home, label: 'Home', color: 'cyan' },
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', color: 'blue' },
     { path: '/agents', icon: Brain, label: 'AI Agents', color: 'purple' },
     { path: '/video-consultation', icon: Video, label: 'Video Call', color: 'indigo' },
     { path: '/hospitals', icon: MapPin, label: 'Hospitals', color: 'red' },
     { path: '/analytics', icon: BarChart3, label: 'Analytics', color: 'green' },
+    ...(isAdmin ? [{ path: '/admin', icon: Shield, label: 'Admin', color: 'orange' }] : []),
   ];
 
   return (
@@ -71,12 +88,31 @@ const Sidebar = () => {
           <Settings className="w-5 h-5 text-blue-300" />
           <span className="font-medium text-blue-100">Settings</span>
         </Link>
+
+        {/* Logout Button */}
+        <button
+          onClick={handleLogout}
+          className="flex items-center space-x-3 px-4 py-3 rounded-xl hover:bg-red-500/20 transition-all duration-300 w-full text-left"
+        >
+          <LogOut className="w-5 h-5 text-red-300" />
+          <span className="font-medium text-red-100">Logout</span>
+        </button>
         
         <div className="mt-4 px-4 py-3 bg-white/5 rounded-xl backdrop-blur-xl">
           <p className="text-xs text-blue-300 mb-1">System Status</p>
           <div className="flex items-center space-x-2">
             <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
             <span className="text-sm text-white font-medium">All Agents Active</span>
+          </div>
+          {/* User Info */}
+          <div className="mt-3 pt-3 border-t border-white/10">
+            <p className="text-xs text-blue-300">Logged in as</p>
+            <p className="text-sm text-white font-medium truncate">
+              {localStorage.getItem('user_name') || 'User'}
+            </p>
+            <p className="text-xs text-blue-200">
+              {localStorage.getItem('user_type') || ''}
+            </p>
           </div>
         </div>
       </div>

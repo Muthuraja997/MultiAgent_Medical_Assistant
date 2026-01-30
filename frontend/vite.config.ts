@@ -6,6 +6,12 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 3000,
+    host: true, // Allow external access
+    allowedHosts: [
+      'unhumidifying-relational-drema.ngrok-free.dev',
+      '.ngrok-free.app',
+      '.ngrok.io',
+    ],
     proxy: {
       '/api': {
         target: 'http://localhost:8000',

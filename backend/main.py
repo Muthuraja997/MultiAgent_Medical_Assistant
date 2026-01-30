@@ -10,7 +10,7 @@ import uuid
 import glob
 import threading
 import time
-from typing import Optional
+from typing import Optional, List, Dict, Any
 
 # Add current directory to path to import from backend
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -27,11 +27,20 @@ from models.schemas import (
     QueryRequest, ChatResponse, UploadResponse,
     ValidationRequest, ValidationResponse,
     SpeechRequest, TranscriptionResponse,
-    HealthResponse, ErrorResponse
+    HealthResponse, ErrorResponse,
+    # Database models
+    LoginRequest, LoginResponse,
+    RegisterRequest, RegisterResponse,
+    UserCreate, UserUpdate, UserResponse,
+    DoctorCreate, DoctorUpdate, DoctorResponse,
+    MeetingCreate, MeetingUpdate, MeetingResponse,
+    AppointmentRequestCreate, AppointmentRequestResponse, AppointmentRequestUpdate,
+    StatisticsResponse
 )
 from services.agent_service import AgentService
 from services.image_service import ImageService
 from services.speech_service import SpeechService
+from services.database_service import db_manager
 from core.config import Config
 
 # Load configuration
@@ -94,6 +103,22 @@ def cleanup_old_audio():
 # Start background cleanup thread
 cleanup_thread = threading.Thread(target=cleanup_old_audio, daemon=True)
 cleanup_thread.start()
+
+
+# ==================== DATABASE STARTUP/SHUTDOWN ====================
+
+@app.on_event("startup")
+async def startup_db():
+    """Connect to MongoDB on startup"""
+    await db_manager.connect_async()
+    print("✅ Database connection established")
+
+
+@app.on_event("shutdown")
+async def shutdown_db():
+    """Disconnect from MongoDB on shutdown"""
+    await db_manager.close_async()
+    print("❌ Database connection closed")
 
 
 # ==================== API ENDPOINTS ====================
@@ -461,6 +486,499 @@ out center tags;"""
             status_code=500,
             detail=f"Internal server error: {str(e)}"
         )
+
+
+# ==================== AUTHENTICATION ENDPOINT ====================
+
+@app.post("/api/login", response_model=LoginResponse, tags=["Authentication"])
+async def login(login_request: LoginRequest):
+    """User/Doctor login endpoint"""
+    try:
+        # Authenticate user
+        user_data = await db_manager.login_user(
+            login_request.user_id,
+            login_request.password,
+            login_request.user_type.value
+        )
+        
+        if not user_data:
+            return LoginResponse(
+                success=False,
+                message="Invalid credentials",
+                user_id="",
+                user_name="",
+                user_type=login_request.user_type
+            )
+        
+        # Generate token
+        from services.auth_service import auth_service
+        token = auth_service.generate_token(
+            login_request.user_id,
+            login_request.user_type.value
+        )
+        
+        # Get name based on user type
+        if login_request.user_type.value == "USER":
+            user_name = user_data.get("user_name", "")
+        else:  # DOCTOR
+            user_name = user_data.get("doc_name", "")
+        
+        return LoginResponse(
+            success=True,
+            message="Login successful",
+            user_id=login_request.user_id,
+            user_name=user_name,
+            user_type=login_request.user_type,
+            token=token
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/register", response_model=RegisterResponse, tags=["Authentication"])
+async def register(register_request: RegisterRequest):
+    """User/Doctor registration endpoint"""
+    try:
+        # Validate user_id format
+        user_type = register_request.user_type.value
+        if user_type == "USER" and not register_request.user_id.startswith("user_"):
+            return RegisterResponse(
+                success=False,
+                message="User ID must start with 'user_' (e.g., user_001)"
+            )
+        elif user_type == "DOCTOR" and not register_request.user_id.startswith("doc_"):
+            return RegisterResponse(
+                success=False,
+                message="Doctor ID must start with 'doc_' (e.g., doc_001)"
+            )
+        
+        # Register user/doctor
+        result = await db_manager.register_user({
+            "user_id": register_request.user_id,
+            "name": register_request.name,
+            "password": register_request.password,
+            "user_type": user_type,
+            "email": register_request.email,
+            "phone": register_request.phone
+        })
+        
+        if not result:
+            return RegisterResponse(
+                success=False,
+                message=f"This {user_type.lower()} ID is already taken. Please choose another."
+            )
+        
+        return RegisterResponse(
+            success=True,
+            message="Registration successful! You can now login.",
+            user_id=register_request.user_id,
+            user_name=register_request.name,
+            user_type=register_request.user_type
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== USER MANAGEMENT ENDPOINTS ====================
+
+@app.post("/api/users", response_model=dict, tags=["Users"])
+async def create_user(user: UserCreate):
+    """Create a new user"""
+    try:
+        # Check if user already exists
+        existing_user = await db_manager.get_user(user.user_id)
+        if existing_user:
+            raise HTTPException(status_code=400, detail="User already exists")
+        
+        user_data = user.dict()
+        result_id = await db_manager.create_user(user_data)
+        return {"status": "success", "message": "User created", "id": result_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/users", response_model=List[dict], tags=["Users"])
+async def get_all_users(user_type: Optional[str] = None):
+    """Get all users, optionally filtered by type"""
+    try:
+        users = await db_manager.get_all_users(user_type)
+        # Convert ObjectId to string for JSON serialization
+        for user in users:
+            user["_id"] = str(user["_id"])
+        return users
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/users/{user_id}", response_model=dict, tags=["Users"])
+async def get_user(user_id: str):
+    """Get user by ID"""
+    try:
+        user = await db_manager.get_user(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        user["_id"] = str(user["_id"])
+        return user
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/api/users/{user_id}", response_model=dict, tags=["Users"])
+async def update_user(user_id: str, user_update: UserUpdate):
+    """Update user information"""
+    try:
+        update_data = {k: v for k, v in user_update.dict().items() if v is not None}
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No data to update")
+        
+        success = await db_manager.update_user(user_id, update_data)
+        if not success:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        return {"status": "success", "message": "User updated"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/users/{user_id}", response_model=dict, tags=["Users"])
+async def delete_user(user_id: str):
+    """Delete a user"""
+    try:
+        success = await db_manager.delete_user(user_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="User not found")
+        return {"status": "success", "message": "User deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== DOCTOR MANAGEMENT ENDPOINTS ====================
+
+@app.post("/api/doctors", response_model=dict, tags=["Doctors"])
+async def create_doctor(doctor: DoctorCreate):
+    """Create a new doctor"""
+    try:
+        existing_doctor = await db_manager.get_doctor(doctor.doctor_id)
+        if existing_doctor:
+            raise HTTPException(status_code=400, detail="Doctor already exists")
+        
+        doctor_data = doctor.dict()
+        result_id = await db_manager.create_doctor(doctor_data)
+        return {"status": "success", "message": "Doctor created", "id": result_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/doctors", response_model=List[dict], tags=["Doctors"])
+async def get_all_doctors(available_only: bool = False):
+    """Get all doctors"""
+    try:
+        doctors = await db_manager.get_all_doctors(available_only)
+        for doctor in doctors:
+            doctor["_id"] = str(doctor["_id"])
+        return doctors
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/doctors/{doctor_id}", response_model=dict, tags=["Doctors"])
+async def get_doctor(doctor_id: str):
+    """Get doctor by ID"""
+    try:
+        doctor = await db_manager.get_doctor(doctor_id)
+        if not doctor:
+            raise HTTPException(status_code=404, detail="Doctor not found")
+        doctor["_id"] = str(doctor["_id"])
+        return doctor
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/api/doctors/{doctor_id}", response_model=dict, tags=["Doctors"])
+async def update_doctor(doctor_id: str, doctor_update: DoctorUpdate):
+    """Update doctor information"""
+    try:
+        update_data = {k: v for k, v in doctor_update.dict().items() if v is not None}
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No data to update")
+        
+        success = await db_manager.update_doctor(doctor_id, update_data)
+        if not success:
+            raise HTTPException(status_code=404, detail="Doctor not found")
+        
+        return {"status": "success", "message": "Doctor updated"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/doctors/{doctor_id}", response_model=dict, tags=["Doctors"])
+async def delete_doctor(doctor_id: str):
+    """Delete a doctor"""
+    try:
+        success = await db_manager.delete_doctor(doctor_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Doctor not found")
+        return {"status": "success", "message": "Doctor deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.patch("/api/doctors/{doctor_id}/availability", response_model=dict, tags=["Doctors"])
+async def update_doctor_availability(doctor_id: str, available: bool):
+    """Update doctor availability status"""
+    try:
+        success = await db_manager.update_doctor_availability(doctor_id, available)
+        if not success:
+            raise HTTPException(status_code=404, detail="Doctor not found")
+        return {"status": "success", "message": "Availability updated"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== MEETING MANAGEMENT ENDPOINTS ====================
+
+@app.post("/api/meetings", response_model=dict, tags=["Meetings"])
+async def create_meeting(meeting: MeetingCreate):
+    """Create a new meeting"""
+    try:
+        # Verify doctor exists
+        doctor = await db_manager.get_doctor(meeting.doctor_id)
+        if not doctor:
+            raise HTTPException(status_code=404, detail="Doctor not found")
+        
+        meeting_data = meeting.dict()
+        result_id = await db_manager.create_meeting(meeting_data)
+        return {"status": "success", "message": "Meeting created", "id": result_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/meetings", response_model=List[dict], tags=["Meetings"])
+async def get_all_meetings():
+    """Get all meetings"""
+    try:
+        meetings = await db_manager.get_all_meetings()
+        for meeting in meetings:
+            meeting["_id"] = str(meeting["_id"])
+        return meetings
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/meetings/user/{user_id}", response_model=List[dict], tags=["Meetings"])
+async def get_user_meetings(user_id: str):
+    """Get all meetings for a user"""
+    try:
+        meetings = await db_manager.get_user_meetings(user_id)
+        for meeting in meetings:
+            meeting["_id"] = str(meeting["_id"])
+        return meetings
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/meetings/doctor/{doctor_id}", response_model=List[dict], tags=["Meetings"])
+async def get_doctor_meetings(doctor_id: str):
+    """Get all meetings for a doctor"""
+    try:
+        meetings = await db_manager.get_doctor_meetings(doctor_id)
+        for meeting in meetings:
+            meeting["_id"] = str(meeting["_id"])
+        return meetings
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/meetings/{meeting_id}", response_model=dict, tags=["Meetings"])
+async def get_meeting(meeting_id: str):
+    """Get meeting by ID"""
+    try:
+        meeting = await db_manager.get_meeting(meeting_id)
+        if not meeting:
+            raise HTTPException(status_code=404, detail="Meeting not found")
+        meeting["_id"] = str(meeting["_id"])
+        return meeting
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/api/meetings/{meeting_id}", response_model=dict, tags=["Meetings"])
+async def update_meeting(meeting_id: str, meeting_update: MeetingUpdate):
+    """Update meeting information"""
+    try:
+        update_data = {k: v for k, v in meeting_update.dict().items() if v is not None}
+        if not update_data:
+            raise HTTPException(status_code=400, detail="No data to update")
+        
+        success = await db_manager.update_meeting(meeting_id, update_data)
+        if not success:
+            raise HTTPException(status_code=404, detail="Meeting not found")
+        
+        return {"status": "success", "message": "Meeting updated"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.delete("/api/meetings/{meeting_id}", response_model=dict, tags=["Meetings"])
+async def delete_meeting(meeting_id: str):
+    """Delete a meeting"""
+    try:
+        success = await db_manager.delete_meeting(meeting_id)
+        if not success:
+            raise HTTPException(status_code=404, detail="Meeting not found")
+        return {"status": "success", "message": "Meeting deleted"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== APPOINTMENT REQUEST ENDPOINTS ====================
+
+@app.post("/api/appointment-requests", response_model=dict, tags=["Appointment Requests"])
+async def create_appointment_request(request: Dict[str, Any]):
+    """Create a new appointment request (User only)"""
+    try:
+        # Get user_id from request body
+        user_id = request.get("user_id")
+        if not user_id:
+            raise HTTPException(status_code=401, detail="User ID is required")
+        
+        # Get user details
+        user = await db_manager.get_user(user_id)
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Get doctor_id from request
+        doctor_id = request.get("doctor_id")
+        if not doctor_id:
+            raise HTTPException(status_code=400, detail="Doctor ID is required")
+        
+        # Check if doctor exists and is available
+        doctor = await db_manager.get_doctor(doctor_id)
+        if not doctor:
+            raise HTTPException(status_code=404, detail="Doctor not found")
+        
+        # Create appointment request
+        request_id = await db_manager.create_appointment_request(
+            user_id=user_id,
+            user_name=user.get("user_name", ""),
+            request_data=request
+        )
+        
+        return {
+            "status": "success",
+            "message": "Appointment request sent successfully",
+            "request_id": request_id
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/appointment-requests/doctor/{doctor_id}", response_model=List[AppointmentRequestResponse], tags=["Appointment Requests"])
+async def get_doctor_appointment_requests(doctor_id: str, status: Optional[str] = None):
+    """Get all appointment requests for a doctor"""
+    try:
+        requests = await db_manager.get_doctor_appointment_requests(doctor_id, status)
+        
+        # Convert ObjectId to string
+        for req in requests:
+            req["request_id"] = str(req.pop("_id"))
+            
+            # Get doctor name
+            doctor = await db_manager.get_doctor(req["doctor_id"])
+            req["doctor_name"] = doctor.get("doc_name") if doctor else None
+        
+        return requests
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/appointment-requests/user/{user_id}", response_model=List[AppointmentRequestResponse], tags=["Appointment Requests"])
+async def get_user_appointment_requests(user_id: str):
+    """Get all appointment requests for a user"""
+    try:
+        requests = await db_manager.get_user_appointment_requests(user_id)
+        
+        # Convert ObjectId to string
+        for req in requests:
+            req["request_id"] = str(req.pop("_id"))
+            
+            # Get doctor name
+            doctor = await db_manager.get_doctor(req["doctor_id"])
+            req["doctor_name"] = doctor.get("doc_name") if doctor else None
+        
+        return requests
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.put("/api/appointment-requests/{request_id}", response_model=dict, tags=["Appointment Requests"])
+async def update_appointment_request(request_id: str, update: AppointmentRequestUpdate):
+    """Update appointment request status (Doctor only)"""
+    try:
+        result = await db_manager.update_appointment_request(
+            request_id=request_id,
+            status=update.status.value,
+            meet_link=update.meet_link
+        )
+        
+        if not result.get("success"):
+            raise HTTPException(status_code=404, detail=result.get("message", "Appointment request not found"))
+        
+        response = {
+            "status": "success",
+            "message": result.get("message", f"Appointment request {update.status.value.lower()}")
+        }
+        
+        # Include meeting details if accepted
+        if result.get("meet_link"):
+            response["meet_link"] = result["meet_link"]
+        if result.get("meeting_id"):
+            response["meeting_id"] = result["meeting_id"]
+        
+        return response
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ==================== ADMIN DASHBOARD ENDPOINTS ====================
+
+@app.get("/api/admin/statistics", response_model=StatisticsResponse, tags=["Admin"])
+async def get_statistics():
+    """Get platform statistics for admin dashboard"""
+    try:
+        stats = await db_manager.get_statistics()
+        return stats
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 # Exception handler for request entity too large
