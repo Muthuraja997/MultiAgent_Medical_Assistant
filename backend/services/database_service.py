@@ -372,7 +372,7 @@ class DatabaseManager:
 
 
 # MongoDB Configuration
-MONGODB_URI = "mongodb+srv://muthu_user:Muthu93@cluster0.b69bba9.mongodb.net/"
+MONGODB_URI = "****************************"
 DATABASE_NAME = "medical_assistant_db"
 
 # Global database manager instance
