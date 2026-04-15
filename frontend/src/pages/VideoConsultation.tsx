@@ -10,7 +10,9 @@ import {
   AlertCircle,
   Loader,
   RefreshCw,
+  Trash2,
 } from 'lucide-react';
+import { api } from '../services/api';
 
 interface AppointmentRequest {
   request_id: string;
@@ -23,6 +25,7 @@ interface AppointmentRequest {
   preferred_time: string;
   status: 'PENDING' | 'ACCEPTED' | 'REJECTED';
   meet_link?: string;
+  meeting_id?: string;
   created_at: string;
 }
 
@@ -109,6 +112,32 @@ const VideoConsultation = () => {
       }
     } catch (error) {
       setMessage({ type: 'error', text: 'Connection error. Please try again.' });
+    } finally {
+      setProcessing(null);
+    }
+  };
+
+  const handleConsultationComplete = async (request: AppointmentRequest) => {
+    if (
+      !window.confirm(
+        'Mark this consultation as finished? The appointment and meeting link will be removed from your lists.'
+      )
+    ) {
+      return;
+    }
+    if (!userId) return;
+    setProcessing(request.request_id);
+    setMessage({ type: '', text: '' });
+    try {
+      await api.completeAppointmentConsultation(request.request_id, userId);
+      setMessage({ type: 'success', text: 'Consultation ended. Appointment removed.' });
+      await fetchAppointmentRequests(true);
+    } catch (err: unknown) {
+      const ax = err as { response?: { data?: { detail?: string } } };
+      setMessage({
+        type: 'error',
+        text: ax.response?.data?.detail || 'Could not remove appointment.',
+      });
     } finally {
       setProcessing(null);
     }
@@ -356,7 +385,7 @@ const VideoConsultation = () => {
                     {request.preferred_date ? formatDate(request.preferred_date) : 'Not specified'} at {request.preferred_time}
                   </div>
                   {request.meet_link && (
-                    <div className="mt-3 pt-3 border-t border-green-300">
+                    <div className="mt-3 pt-3 border-t border-green-300 space-y-2">
                       <a
                         href={request.meet_link}
                         target="_blank"
@@ -371,6 +400,21 @@ const VideoConsultation = () => {
                       </p>
                     </div>
                   )}
+                  <button
+                    type="button"
+                    onClick={() => handleConsultationComplete(request)}
+                    disabled={processing === request.request_id}
+                    className="mt-3 flex items-center justify-center w-full px-4 py-2 border border-gray-300 text-gray-800 font-medium rounded-lg hover:bg-gray-100 transition-all disabled:opacity-50"
+                  >
+                    {processing === request.request_id ? (
+                      <Loader className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Consultation complete — remove appointment
+                      </>
+                    )}
+                  </button>
                 </motion.div>
               ))}
             </div>
@@ -432,24 +476,43 @@ const VideoConsultation = () => {
                 <p className="text-sm text-gray-600">{request.reason || 'No reason provided'}</p>
               </div>
 
-              {request.status === 'ACCEPTED' && request.meet_link && (
-                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+              {request.status === 'ACCEPTED' && (
+                <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-4 space-y-3">
                   <div className="flex items-center justify-between mb-3">
                     <span className="text-sm font-semibold text-green-800">✓ Appointment Confirmed</span>
                     <CheckCircle className="w-5 h-5 text-green-600" />
                   </div>
-                  <a
-                    href={request.meet_link}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center justify-center w-full py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+                  {request.meet_link && (
+                    <>
+                      <a
+                        href={request.meet_link}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center justify-center w-full py-3 bg-gradient-to-r from-blue-600 to-blue-700 text-white font-bold rounded-lg hover:from-blue-700 hover:to-blue-800 transition-all shadow-lg hover:shadow-xl transform hover:scale-105"
+                      >
+                        <Video className="w-5 h-5 mr-2" />
+                        Join Video Consultation
+                      </a>
+                      <p className="text-xs text-gray-600 mt-2 text-center">
+                        Room: {request.meet_link.split('/').pop()}
+                      </p>
+                    </>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => handleConsultationComplete(request)}
+                    disabled={processing === request.request_id}
+                    className="flex items-center justify-center w-full py-2 border border-gray-300 text-gray-800 font-medium rounded-lg hover:bg-white transition-all disabled:opacity-50 text-sm"
                   >
-                    <Video className="w-5 h-5 mr-2" />
-                    Join Video Consultation
-                  </a>
-                  <p className="text-xs text-gray-600 mt-2 text-center">
-                    Room: {request.meet_link.split('/').pop()}
-                  </p>
+                    {processing === request.request_id ? (
+                      <Loader className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <>
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Consultation complete — remove appointment
+                      </>
+                    )}
+                  </button>
                 </div>
               )}
 

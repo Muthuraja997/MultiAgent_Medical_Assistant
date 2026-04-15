@@ -6,19 +6,23 @@ It dynamically routes user queries to the appropriate agent based on content and
 """
 
 import json
+import re
 from typing import Dict, List, Optional, Any, Literal, TypedDict, Union, Annotated
 from langchain_core.messages import HumanMessage, AIMessage, SystemMessage, BaseMessage
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 from langchain_core.runnables import RunnablePassthrough
 from langgraph.graph import MessagesState, StateGraph, END
-import os, getpass
+import os
+import getpass
+import threading
 from dotenv import load_dotenv
 # Lazy imports for heavy dependencies
 # from agents.rag_agent import MedicalRAG
 # from agents.web_search_processor_agent import WebSearchProcessorAgent
 # from agents.image_analysis_agent import ImageAnalysisAgent
 from agents.guardrails.local_guardrails import LocalGuardrails
+from agents.image_analysis_agent import SKIN_LESION_DEPS_MISSING
 
 from langgraph.checkpoint.memory import MemorySaver
 
@@ -37,6 +41,33 @@ memory = MemorySaver()
 
 # Specify a thread
 thread_config = {"configurable": {"thread_id": "1"}}
+
+# PsychologyAssistant loads MentalBERT from HF cache once; reuse across requests.
+_psychology_assistant_lock = threading.Lock()
+_psychology_assistant = None
+
+
+def _is_short_validation_reply(text: str) -> bool:
+    """True for yes/no style replies so we skip the LLM output filter (it rewrites clinical confirmations)."""
+    tl = (text or "").strip().lower()
+    if not tl or len(tl) > 120:
+        return False
+    if not re.match(r"^(yes|no|y|n)\b", tl):
+        return False
+    return len(tl.split()) <= 12
+
+
+def _get_psychology_assistant():
+    """Lazy singleton so MentalBERT is not reloaded from disk on every psychology turn."""
+    global _psychology_assistant
+    if _psychology_assistant is not None:
+        return _psychology_assistant
+    with _psychology_assistant_lock:
+        if _psychology_assistant is None:
+            from agents.psychology_agent import PsychologyAssistant
+
+            _psychology_assistant = PsychologyAssistant(gemini_llm=config.conversation.llm)
+    return _psychology_assistant
 
 
 # Agent that takes the decision of routing the request further to correct task specific agent
@@ -114,6 +145,42 @@ class AgentDecision(TypedDict):
     confidence: float
 
 
+def _decision_system_prompt(enable_brain_tumor: bool) -> str:
+    """Router instructions; brain MRI agent omitted when disabled."""
+    if enable_brain_tumor:
+        return AgentConfig.DECISION_SYSTEM_PROMPT
+    return """You are an intelligent medical triage system that routes user queries to
+    the appropriate specialized agent. Your job is to analyze the user's request and determine which agent
+    is best suited to handle it based on the query content, presence of images, and conversation context.
+
+    Available agents:
+    1. CONVERSATION_AGENT - For general chat, greetings, and non-medical questions. Also for medical images classified as OTHER when no other vision agent applies.
+    2. RAG_AGENT - For specific medical knowledge questions that can be answered from established medical literature. Currently ingested medical knowledge involves 'introduction to brain tumor', 'deep learning techniques to diagnose and detect brain tumors', 'deep learning techniques to diagnose and detect covid / covid-19 from chest x-ray'.
+    3. WEB_SEARCH_PROCESSOR_AGENT - For questions about recent medical developments, current outbreaks, or time-sensitive medical information.
+    4. CHEST_XRAY_AGENT - For analysis of chest X-ray images to detect abnormalities.
+    5. SKIN_LESION_AGENT - For analysis of skin lesion images to classify them as benign or malignant.
+    6. PSYCHOLOGY_AGENT - For mental health support, counseling, stress management, anxiety, depression, and emotional wellbeing. Uses MentalBERT AI model for analysis.
+
+    Brain MRI analysis is disabled in this deployment. Never select BRAIN_TUMOR_AGENT.
+
+    Make your decision based on these guidelines:
+    - If the user has not uploaded any image, always route to the conversation agent.
+    - If the user uploads a medical image, decide which medical vision agent is appropriate based on the image type and the user's query. If the image is uploaded without a query, always route to the correct medical vision agent based on the image type.
+    - If the image type is OTHER or unclear, prefer CONVERSATION_AGENT unless the user text clearly requests chest or skin analysis.
+    - If the user asks about recent medical developments or current health situations, use the web search pocessor agent.
+    - If the user asks specific medical knowledge questions, use the RAG agent.
+    - If the user mentions mental health, emotional distress, anxiety, depression, stress, suicide, psychological issues, or needs emotional support, use the psychology agent.
+    - For general conversation, greetings, or non-medical questions, use the conversation agent. But if image is uploaded, always go to the medical vision agents first when the image type clearly matches CHEST X-RAY or SKIN LESION.
+
+    You must provide your answer in JSON format with the following structure:
+    {{
+    "agent": "AGENT_NAME",
+    "reasoning": "Your step-by-step reasoning for selecting this agent",
+    "confidence": 0.95  // Value between 0.0 and 1.0 indicating your confidence in this decision
+    }}
+    """
+
+
 def create_agent_graph():
     """Create and configure the LangGraph for agent orchestration."""
 
@@ -126,11 +193,13 @@ def create_agent_graph():
     # Initialize the output parser
     json_parser = JsonOutputParser(pydantic_object=AgentDecision)
     
-    # Create the decision prompt
-    decision_prompt = ChatPromptTemplate.from_messages([
-        ("system", AgentConfig.DECISION_SYSTEM_PROMPT),
-        ("human", "{input}")
-    ])
+    # Create the decision prompt (brain tumor agent omitted when disabled)
+    decision_prompt = ChatPromptTemplate.from_messages(
+        [
+            ("system", _decision_system_prompt(config.medical_cv.enable_brain_tumor_agent)),
+            ("human", "{input}"),
+        ]
+    )
     
     # Create the decision chain
     decision_chain = decision_prompt | decision_model | json_parser
@@ -148,9 +217,13 @@ def create_agent_graph():
             input_text = current_input
         elif isinstance(current_input, dict):
             input_text = current_input.get("text", "")
-        
-        # Check input through guardrails if text is present
-        if input_text:
+
+        # Legitimate image-diagnosis flow sends {"text", "image"}; vision agents handle that path.
+        # Input guardrails are text-oriented and often block "what is this image?" as non-text-chatbot work — skip when an image is attached.
+        has_uploaded_image = isinstance(current_input, dict) and bool(current_input.get("image"))
+
+        # Check input through guardrails if text is present (not for image-upload requests)
+        if input_text and not has_uploaded_image:
             is_allowed, message = guardrails.check_input(input_text)
             if not is_allowed:
                 # If input is blocked, return early with guardrail message
@@ -169,14 +242,22 @@ def create_agent_graph():
             has_image = True
             image_path = current_input.get("image", None)
             image_type_response = AgentConfig.get_image_analyzer().analyze_image(image_path)
-            image_type = image_type_response['image_type']
+            if isinstance(image_type_response, dict):
+                image_type = image_type_response.get("image_type", "unknown")
+            else:
+                image_type = "unknown"
             print("ANALYZED IMAGE TYPE: ", image_type)
         
         return {
             **state,
             "has_image": has_image,
             "image_type": image_type,
-            "bypass_routing": False  # Explicitly set to False for normal flow
+            "bypass_routing": False,  # Explicitly set to False for normal flow
+            # Do not reuse prior-turn CV output when the checkpointer reuses thread_id (e.g. "1").
+            "output": None,
+            "needs_human_validation": False,
+            "retrieval_confidence": 0.0,
+            "insufficient_info": False,
         }
     
     def check_if_bypassing(state: AgentState) -> str:
@@ -236,20 +317,22 @@ def create_agent_graph():
                 "reasoning": "API quota exceeded - using fallback routing"
             }
 
-        # Decided agent
-        print(f"Decision: {decision['agent']}")
+        chosen = decision["agent"]
+        if chosen == "BRAIN_TUMOR_AGENT" and not config.medical_cv.enable_brain_tumor_agent:
+            chosen = "CONVERSATION_AGENT"
+            print("[INFO] BRAIN_TUMOR_AGENT is disabled — routing to CONVERSATION_AGENT")
+
+        print(f"Decision: {chosen}")
         
-        # Update state with decision
         updated_state = {
             **state,
-            "agent_name": decision["agent"],
+            "agent_name": chosen,
         }
         
-        # Route based on agent name and confidence
         if decision["confidence"] < AgentConfig.CONFIDENCE_THRESHOLD:
-            return {"agent_state": updated_state, "next": "needs_validation"}
-        
-        return {"agent_state": updated_state, "next": decision["agent"]}
+            return {**updated_state, "next": "needs_validation"}
+
+        return {**updated_state, "next": chosen}
 
     # Define agent execution functions (these will be implemented in their respective modules)
     def run_conversation_agent(state: AgentState) -> AgentState:
@@ -494,17 +577,71 @@ The free tier has a limit of 20 requests per minute. Please try again shortly!""
         return "check_validation"  # No transition needed if confidence is high and info is sufficient
     
     def run_brain_tumor_agent(state: AgentState) -> AgentState:
-        """Handle brain MRI image analysis."""
+        """Handle brain MRI image analysis using the DenseNet121 4-class classifier."""
 
         print(f"Selected agent: BRAIN_TUMOR_AGENT")
 
-        response = AIMessage(content="This would be handled by the brain tumor agent, analyzing the MRI image.")
+        if not config.medical_cv.enable_brain_tumor_agent:
+            response = AIMessage(
+                content="Brain MRI analysis is not enabled in this deployment. "
+                "For general questions about imaging, you can describe your concern in text."
+            )
+            return {
+                **state,
+                "output": response,
+                "needs_human_validation": False,
+                "agent_name": "CONVERSATION_AGENT",
+            }
+
+        current_input = state["current_input"]
+        image_path = current_input.get("image", None) if isinstance(current_input, dict) else None
+
+        if not image_path:
+            response = AIMessage(
+                content="No brain MRI image was found in this request. Please upload a brain scan image and try again."
+            )
+            return {
+                **state,
+                "output": response,
+                "needs_human_validation": False,
+                "agent_name": "BRAIN_TUMOR_AGENT",
+            }
+
+        try:
+            predicted = AgentConfig.get_image_analyzer().classify_brain_tumor(image_path)
+        except Exception as e:
+            print(f"Error in brain tumor agent: {e}")
+            predicted = None
+
+        if predicted is None:
+            response = AIMessage(
+                content=(
+                    "The brain MRI model is not available or could not run on this image. "
+                    "Add a compatible **DenseNet121** checkpoint (4 classes: glioma, meningioma, pituitary, notumor) at "
+                    f"`{config.medical_cv.brain_tumor_model_path}`, or set **BRAIN_TUMOR_GDRIVE_ID** in `.env` to download weights once. "
+                    "This is assistive only and must be confirmed by a qualified radiologist."
+                )
+            )
+        else:
+            display = {
+                "glioma": "glioma",
+                "meningioma": "meningioma",
+                "pituitary": "pituitary tumor",
+                "notumor": "no tumor / notumor class (this slice)",
+            }.get(predicted, predicted)
+            response = AIMessage(
+                content=(
+                    f"The brain MRI classifier predicts this slice is most consistent with: **{display}** "
+                    f"(label: `{predicted}`). "
+                    "This is **not** a definitive diagnosis; imaging must be interpreted in clinical context by a licensed specialist."
+                )
+            )
 
         return {
             **state,
             "output": response,
-            "needs_human_validation": True,  # Medical diagnosis always needs validation
-            "agent_name": "BRAIN_TUMOR_AGENT"
+            "needs_human_validation": True,
+            "agent_name": "BRAIN_TUMOR_AGENT",
         }
     
     def run_chest_xray_agent(state: AgentState) -> AgentState:
@@ -542,10 +679,17 @@ The free tier has a limit of 20 requests per minute. Please try again shortly!""
 
         print(f"Selected agent: SKIN_LESION_AGENT")
 
-        # classify chest x-ray into covid or normal
         predicted_mask = AgentConfig.get_image_analyzer().segment_skin_lesion(image_path)
 
-        if predicted_mask:
+        if predicted_mask == SKIN_LESION_DEPS_MISSING:
+            response = AIMessage(
+                content=(
+                    "Skin lesion segmentation could not run because a required package is missing on the server "
+                    "(for example **gdown** for model download). Install backend dependencies from `requirements.txt` "
+                    "and restart the API. This is a configuration issue—not a judgment that your image is invalid."
+                )
+            )
+        elif predicted_mask:
             response = AIMessage(content="Following is the analyzed **segmented** output of the uploaded skin lesion image:")
         else:
             response = AIMessage(content="The uploaded image is not clear enough to make a diagnosis / the image is not a medical image.")
@@ -583,13 +727,7 @@ The free tier has a limit of 20 requests per minute. Please try again shortly!""
                 recent_context += f"Assistant: {msg.content}\n"
         
         try:
-            # Lazy import to avoid loading heavy model if not needed
-            from agents.psychology_agent import PsychologyAssistant
-            
-            # Initialize psychology assistant with Gemini LLM from config
-            psych_assistant = PsychologyAssistant(gemini_llm=config.conversation.llm)
-            
-            # Process the query with full analysis
+            psych_assistant = _get_psychology_assistant()
             result = psych_assistant.process_query(input_text)
             
             # Get the response
@@ -639,8 +777,8 @@ The free tier has a limit of 20 requests per minute. Please try again shortly!""
     def handle_human_validation(state: AgentState) -> Dict:
         """Prepare for human validation if needed."""
         if state.get("needs_human_validation", False):
-            return {"agent_state": state, "next": "human_validation", "agent": "HUMAN_VALIDATION"}
-        return {"agent_state": state, "next": END}
+            return {**state, "next": "human_validation"}
+        return {**state, "next": END}
     
     def perform_human_validation(state: AgentState) -> AgentState:
         """Handle human validation process."""
@@ -669,6 +807,12 @@ The free tier has a limit of 20 requests per minute. Please try again shortly!""
             return state
 
         output_text = output if isinstance(output, str) else output.content
+
+        input_text = ""
+        if isinstance(current_input, str):
+            input_text = current_input
+        elif isinstance(current_input, dict):
+            input_text = current_input.get("text", "") or ""
         
         # If the last message was a human validation message
         if "Human Validation Required" in output_text:
@@ -677,7 +821,7 @@ The free tier has a limit of 20 requests per minute. Please try again shortly!""
             if isinstance(current_input, str):
                 validation_input = current_input
             elif isinstance(current_input, dict):
-                validation_input = current_input.get("text", "")
+                validation_input = current_input.get("text", "") or ""
             
             # If validation input exists
             if validation_input.lower().startswith(('yes', 'no')):
@@ -697,13 +841,23 @@ The free tier has a limit of 20 requests per minute. Please try again shortly!""
                     **state,
                     "messages": validation_response
                 }
-        
-        # Get the original input text
-        input_text = ""
-        if isinstance(current_input, str):
-            input_text = current_input
-        elif isinstance(current_input, dict):
-            input_text = current_input.get("text", "")
+
+            # Pending HITL (e.g. fresh upload): do not run the generic LLM output filter on
+            # assistive CV results — it often rewrites them as blanket refusals.
+            passthrough = output if isinstance(output, AIMessage) else AIMessage(content=output_text)
+            return {
+                **state,
+                "messages": passthrough,
+                "output": passthrough,
+            }
+
+        if _is_short_validation_reply(input_text):
+            passthrough = output if isinstance(output, AIMessage) else AIMessage(content=output_text)
+            return {
+                **state,
+                "messages": passthrough,
+                "output": passthrough,
+            }
         
         # Apply output sanitization
         sanitized_output = guardrails.check_output(output_text, input_text)

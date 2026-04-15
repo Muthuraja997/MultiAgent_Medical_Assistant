@@ -98,25 +98,33 @@ class AgentService:
             dict: Validation response
         """
         try:
-            validation_query = f"Validation result: {validation_result}"
+            # Graph guardrails expect the literal reply to start with Yes/No (see apply_output_guardrails).
+            vr = (validation_result or "").strip()
+            vl = vr.lower()
+            if vl == "yes" or vl.startswith("yes "):
+                validation_query = "Yes"
+            elif vl == "no" or vl.startswith("no "):
+                validation_query = "No"
+            else:
+                validation_query = vr
             if comments:
-                validation_query += f" Comments: {comments}"
-            
+                validation_query = f"{validation_query}\nComments: {comments}"
+
             response_data = agent_process_query(validation_query)
             response_text = response_data['messages'][-1].content
-            
-            if validation_result.lower() == 'yes':
+
+            confirmed = vl == "yes" or vl.startswith("yes ")
+            if confirmed:
                 return {
                     "status": "validated",
                     "message": "**Output confirmed by human validator:**",
                     "response": response_text
                 }
-            else:
-                return {
-                    "status": "rejected",
-                    "comments": comments,
-                    "message": "**Output requires further review:**",
-                    "response": response_text
-                }
+            return {
+                "status": "rejected",
+                "comments": comments,
+                "message": "**Output requires further review:**",
+                "response": response_text
+            }
         except Exception as e:
             raise Exception(f"Validation processing error: {str(e)}")

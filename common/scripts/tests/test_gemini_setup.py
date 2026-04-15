@@ -27,11 +27,12 @@ def test_gemini_api():
     try:
         from langchain_google_genai import ChatGoogleGenerativeAI
         
+        model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
         llm = ChatGoogleGenerativeAI(
-            model="gemini-pro",
+            model=model,
             google_api_key=api_key,
             temperature=0.1,
-            convert_system_message_to_human=True
+            convert_system_message_to_human=True,
         )
         
         # Test a simple query

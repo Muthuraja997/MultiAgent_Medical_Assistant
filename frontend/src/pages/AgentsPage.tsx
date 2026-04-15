@@ -1,4 +1,4 @@
-import { Brain, Search, Stethoscope, Shield, Eye, Scan } from 'lucide-react';
+import { Brain, Search, Stethoscope, Shield, Eye, Mic } from 'lucide-react';
 
 const AgentsPage = () => {
   const agents = [
@@ -27,14 +27,6 @@ const AgentsPage = () => {
       capabilities: ['Latest Research', 'Clinical Trials', 'Medical News'],
     },
     {
-      name: 'Brain Tumor Agent',
-      icon: Scan,
-      description: 'MRI analysis for brain tumor detection and segmentation',
-      color: 'red',
-      status: 'active',
-      capabilities: ['MRI Analysis', 'Tumor Detection', 'Segmentation'],
-    },
-    {
       name: 'Chest X-ray Agent',
       icon: Stethoscope,
       description: 'Chest X-ray analysis for COVID-19 and lung diseases',
@@ -57,6 +49,14 @@ const AgentsPage = () => {
       color: 'gray',
       status: 'active',
       capabilities: ['Safety Check', 'Validation', 'Quality Assurance'],
+    },
+    {
+      name: 'Voice Agent',
+      icon: Mic,
+      description: 'Realtime voice Q&A for wellness and mental health (Deepgram + Hugging Face Llama)',
+      color: 'indigo',
+      status: 'active',
+      capabilities: ['Voice STT/TTS', 'Mental Health', 'Medical Education'],
     },
   ];
 

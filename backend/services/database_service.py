@@ -10,6 +10,12 @@ from typing import Optional, List, Dict, Any
 from datetime import datetime
 from bson import ObjectId
 from services.auth_service import auth_service
+import os
+from dotenv import load_dotenv
+
+_backend_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(_backend_root, ".env"))
+load_dotenv()
 
 
 class DatabaseManager:
@@ -27,6 +33,13 @@ class DatabaseManager:
         self.client = AsyncIOMotorClient(self.mongodb_uri)
         self.db = self.client[self.database_name]
         print(f"✅ Connected to MongoDB: {self.database_name}")
+        try:
+            await self.db.direct_messages.create_index(
+                [("conversation_key", 1), ("created_at", 1)],
+                name="direct_messages_conversation_time",
+            )
+        except Exception as e:
+            print(f"[DB] direct_messages index note: {e}")
     
     async def close_async(self):
         """Close MongoDB connection"""
@@ -146,6 +159,8 @@ class DatabaseManager:
         """Create a new doctor"""
         # Hash password before storing
         doctor_data["password"] = auth_service.hash_password(doctor_data["password"])
+        if "available_status" not in doctor_data or doctor_data.get("available_status") is None:
+            doctor_data["available_status"] = True
         doctor_data["created_at"] = datetime.utcnow()
         result = await self.db.doctors.insert_one(doctor_data)
         return str(result.inserted_id)
@@ -182,12 +197,12 @@ class DatabaseManager:
         return result.modified_count > 0
     
     async def update_doctor_availability(self, doctor_id: str, available: bool) -> bool:
-        """Update doctor availability status"""
+        """Update doctor availability status (matched_count so idempotent toggle succeeds)."""
         result = await self.db.doctors.update_one(
             {"doctor_id": doctor_id},
             {"$set": {"available_status": available, "updated_at": datetime.utcnow()}}
         )
-        return result.modified_count > 0
+        return result.matched_count > 0
     
     async def delete_doctor(self, doctor_id: str) -> bool:
         """Delete a doctor"""
@@ -337,6 +352,47 @@ class DatabaseManager:
             }
         else:
             return {"success": False, "message": "Failed to update appointment"}
+
+    async def remove_completed_consultation(self, request_id: str, actor_id: str) -> Dict[str, Any]:
+        """
+        After doctor and patient finish a video consultation, remove the appointment and meeting.
+        Only the linked user or doctor may call this. Doctor is marked available again.
+        """
+        try:
+            oid = ObjectId(request_id)
+        except Exception:
+            return {"success": False, "message": "Invalid appointment id"}
+
+        request = await self.db.appointments.find_one({"_id": oid})
+        if not request:
+            return {"success": False, "message": "Appointment request not found"}
+
+        uid = request.get("user_id")
+        did = request.get("doctor_id")
+        if actor_id != uid and actor_id != did:
+            return {"success": False, "message": "Only the patient or assigned doctor can end this consultation"}
+
+        if request.get("status") != "ACCEPTED":
+            return {
+                "success": False,
+                "message": "Only accepted (active) consultations can be removed. Pending or rejected requests use cancel/reject instead.",
+            }
+
+        rid = str(request["_id"])
+        mid = request.get("meeting_id")
+        if mid:
+            try:
+                await self.db.meetings.delete_one({"_id": ObjectId(mid)})
+            except Exception:
+                pass
+        await self.db.meetings.delete_many({"appointment_id": {"$in": [rid, request_id]}})
+
+        await self.db.appointments.delete_one({"_id": oid})
+
+        if did:
+            await self.update_doctor_availability(did, True)
+
+        return {"success": True, "message": "Consultation closed; appointment and meeting removed."}
     
     async def get_meeting(self, meeting_id: str) -> Optional[Dict[str, Any]]:
         """Get meeting by ID"""
@@ -352,6 +408,109 @@ class DatabaseManager:
         cursor = self.db.meetings.find({"doctor_id": doctor_id}).sort("created_at", -1)
         return await cursor.to_list(length=None)
     
+    # ==================== DIRECT MESSAGES (USER / DOCTOR CHAT) ====================
+
+    @staticmethod
+    def _conversation_key(participant_a: str, participant_b: str) -> str:
+        a, b = sorted([(participant_a or "").strip(), (participant_b or "").strip()])
+        return f"{a}||{b}"
+
+    async def _resolve_participant(self, account_id: str) -> Optional[Dict[str, Any]]:
+        """Return {'id', 'kind', 'display_name'} if account exists as user or doctor."""
+        aid = (account_id or "").strip()
+        if not aid:
+            return None
+        user = await self.db.users.find_one({"user_id": aid})
+        if user:
+            return {
+                "id": aid,
+                "kind": "USER",
+                "display_name": user.get("user_name") or aid,
+            }
+        doctor = await self.db.doctors.find_one({"doctor_id": aid})
+        if doctor:
+            return {
+                "id": aid,
+                "kind": "DOCTOR",
+                "display_name": doctor.get("doc_name") or aid,
+            }
+        return None
+
+    async def send_direct_message(
+        self, sender_id: str, receiver_id: str, body: str
+    ) -> Dict[str, Any]:
+        """Store a message between two valid accounts (user and/or doctor)."""
+        sid = (sender_id or "").strip()
+        rid = (receiver_id or "").strip()
+        text = (body or "").strip()
+        if not text:
+            raise ValueError("message cannot be empty")
+        if not sid or not rid:
+            raise ValueError("sender_id and receiver_id are required")
+        if sid == rid:
+            raise ValueError("sender_id and receiver_id must differ")
+
+        sender = await self._resolve_participant(sid)
+        receiver = await self._resolve_participant(rid)
+        if not sender:
+            raise ValueError(f"Unknown sender_id: {sid}")
+        if not receiver:
+            raise ValueError(f"Unknown receiver_id: {rid}")
+
+        key = self._conversation_key(sid, rid)
+        doc = {
+            "conversation_key": key,
+            "sender_id": sid,
+            "receiver_id": rid,
+            "message": text,
+            "created_at": datetime.utcnow(),
+        }
+        result = await self.db.direct_messages.insert_one(doc)
+        return {
+            "message_id": str(result.inserted_id),
+            "sender_id": sid,
+            "receiver_id": rid,
+            "message": text,
+            "created_at": doc["created_at"],
+        }
+
+    async def list_direct_messages(
+        self, user_id: str, peer_id: str, limit: int = 200
+    ) -> List[Dict[str, Any]]:
+        """List messages between user_id and peer_id in chronological order."""
+        uid = (user_id or "").strip()
+        pid = (peer_id or "").strip()
+        if not uid or not pid:
+            raise ValueError("user_id and peer_id are required")
+        if uid == pid:
+            raise ValueError("user_id and peer_id must differ")
+
+        a = await self._resolve_participant(uid)
+        b = await self._resolve_participant(pid)
+        if not a or not b:
+            raise ValueError("One or both accounts do not exist")
+
+        key = self._conversation_key(uid, pid)
+        cap = max(1, min(int(limit or 200), 500))
+        cursor = (
+            self.db.direct_messages.find({"conversation_key": key})
+            .sort("created_at", 1)
+            .limit(cap)
+        )
+        rows = await cursor.to_list(length=cap)
+        out: List[Dict[str, Any]] = []
+        for row in rows:
+            out.append(
+                {
+                    "message_id": str(row["_id"]),
+                    "sender_id": row["sender_id"],
+                    "receiver_id": row["receiver_id"],
+                    "message": row["message"],
+                    "created_at": row.get("created_at"),
+                }
+            )
+        return out
+
     # ==================== STATISTICS ====================
     
     async def get_statistics(self) -> Dict[str, int]:
@@ -372,8 +531,15 @@ class DatabaseManager:
 
 
 # MongoDB Configuration
-MONGODB_URI = "*************************************"
-DATABASE_NAME = "medical_assistant_db"
+MONGODB_URI = os.getenv("MONGODB_URI")
+DATABASE_NAME = os.getenv("DATABASE_NAME", "medical_assistant_db")
+
+# Validate MongoDB URI
+if not MONGODB_URI:
+    raise ValueError("MONGODB_URI environment variable is not set. Please check your .env file.")
+
+if not MONGODB_URI.startswith(("mongodb://", "mongodb+srv://")):
+    raise ValueError(f"Invalid MongoDB URI format: {MONGODB_URI[:20]}... URI must begin with 'mongodb://' or 'mongodb+srv://'")
 
 # Global database manager instance
 db_manager = DatabaseManager(MONGODB_URI, DATABASE_NAME)

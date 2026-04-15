@@ -22,6 +22,17 @@ interface Hospital {
   opening_hours?: string;
 }
 
+/** Same path on localhost; includes port only when the current page URL has one (avoids http://localhost:/path). */
+function localhostUrlForCurrentPath(): string {
+  const { port, pathname } = window.location;
+  const portPart = port ? `:${port}` : '';
+  return `http://localhost${portPart}${pathname}`;
+}
+
+function ngrokPortHint(): string {
+  return window.location.port || '3000';
+}
+
 const HospitalLocator = () => {
   const [userLocation, setUserLocation] = useState<{ lat: number; lon: number } | null>(null);
   const [hospitals, setHospitals] = useState<Hospital[]>([]);
@@ -61,8 +72,34 @@ const HospitalLocator = () => {
     setLoading(true);
     setError(null);
 
+    // Check if geolocation is supported
     if (!navigator.geolocation) {
       setError('Geolocation is not supported by your browser');
+      setLoading(false);
+      return;
+    }
+
+    // Check if page is served over HTTPS or localhost
+    const isSecure = window.location.protocol === 'https:' || 
+                     window.location.hostname === 'localhost' || 
+                     window.location.hostname === '127.0.0.1';
+
+    if (!isSecure) {
+      const currentUrl = window.location.href;
+      const isLocalNetwork = /^http:\/\/(10\.|172\.(1[6-9]|2[0-9]|3[01])\.|192\.168\.)/.test(currentUrl);
+      
+      let errorMsg = 'Geolocation requires HTTPS or localhost. ';
+      
+      if (isLocalNetwork) {
+        errorMsg +=
+          'You are accessing via local network IP. Please use one of these options instead: (1) ' +
+          localhostUrlForCurrentPath() +
+          ' or (2) Setup ngrok for HTTPS access.';
+      } else {
+        errorMsg += 'Please access via HTTPS URL (e.g., https://your-ngrok-url.ngrok-free.dev) or use localhost for testing.';
+      }
+      
+      setError(errorMsg);
       setLoading(false);
       return;
     }
@@ -78,7 +115,22 @@ const HospitalLocator = () => {
         fetchHospitals(location);
       },
       (error) => {
-        setError(`Unable to retrieve your location: ${error.message}`);
+        let errorMessage = `Unable to retrieve your location: ${error.message}`;
+        
+        // Provide helpful error messages based on error code
+        switch (error.code) {
+          case error.PERMISSION_DENIED:
+            errorMessage = 'Location permission denied. Please allow location access in your browser settings.';
+            break;
+          case error.POSITION_UNAVAILABLE:
+            errorMessage = 'Location information is unavailable. Please try again.';
+            break;
+          case error.TIMEOUT:
+            errorMessage = 'Location request timed out. Please try again.';
+            break;
+        }
+        
+        setError(errorMessage);
         setLoading(false);
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
@@ -251,12 +303,46 @@ const HospitalLocator = () => {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-3"
+            className="mt-4 p-4 bg-red-50 border border-red-200 rounded-lg"
           >
-            <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
-            <div>
-              <p className="text-red-800 font-medium">Error</p>
-              <p className="text-red-700 text-sm">{error}</p>
+            <div className="flex items-start gap-3">
+              <AlertCircle className="w-5 h-5 text-red-600 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="text-red-800 font-medium">Error</p>
+                <p className="text-red-700 text-sm">{error}</p>
+                
+                {/* Show HTTPS help if it's a secure context issue */}
+                {(error.includes('HTTPS') || error.includes('localhost')) && (
+                  <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <p className="text-blue-800 font-medium text-sm mb-2">💡 Quick Fix Options:</p>
+                    
+                    {/* Option 1: Localhost Link */}
+                    <div className="mb-3 p-2 bg-white rounded border border-blue-300">
+                      <p className="text-blue-800 text-xs font-semibold mb-1">✅ Option 1: Use Localhost (Easiest)</p>
+                      <a
+                        href={localhostUrlForCurrentPath()}
+                        className="text-blue-600 hover:text-blue-800 underline text-xs font-mono break-all"
+                      >
+                        {localhostUrlForCurrentPath()}
+                      </a>
+                      <p className="text-gray-600 text-xs mt-1">👆 Click to open in localhost</p>
+                    </div>
+                    
+                    {/* Option 2: Ngrok HTTPS */}
+                    <div className="p-2 bg-white rounded border border-blue-300">
+                      <p className="text-blue-800 text-xs font-semibold mb-1">✅ Option 2: Use Ngrok HTTPS</p>
+                      <code className="text-xs text-gray-700 block bg-gray-100 p-2 rounded">
+                        ngrok http {ngrokPortHint()}
+                      </code>
+                      <p className="text-gray-600 text-xs mt-1">Then use the <strong>https://</strong> URL provided</p>
+                    </div>
+                    
+                    <p className="text-blue-600 text-xs mt-2">
+                      Current URL: <code className="bg-blue-100 px-1 rounded">{window.location.href}</code>
+                    </p>
+                  </div>
+                )}
+              </div>
             </div>
           </motion.div>
         )}

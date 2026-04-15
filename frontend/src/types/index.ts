@@ -7,6 +7,8 @@ export interface Message {
   confidence?: number;
   metadata?: any;
   image_path?: string;
+  /** Data URL of image the user sent (shown in the user bubble). */
+  attachedImageDataUrl?: string;
 }
 
 export interface Agent {
@@ -17,11 +19,4 @@ export interface Agent {
   color: string;
   capabilities: string[];
   status: 'active' | 'inactive';
-}
-
-export interface AnalyticsData {
-  totalQueries: number;
-  successRate: number;
-  avgResponseTime: number;
-  agentUsage: { [key: string]: number };
 }

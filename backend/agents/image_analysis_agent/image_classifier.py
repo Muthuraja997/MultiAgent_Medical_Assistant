@@ -13,10 +13,11 @@ class ClassificationDecision(TypedDict):
     confidence: float
 
 class ImageClassifier:
-    """Uses GPT-4o Vision to analyze images and determine their type."""
-    
-    def __init__(self, vision_model):
+    """Uses multimodal LLM (Gemini) to classify medical image type."""
+
+    def __init__(self, vision_model, enable_brain_mri: bool = False):
         self.vision_model = vision_model
+        self.enable_brain_mri = enable_brain_mri
         self.json_parser = JsonOutputParser(pydantic_object=ClassificationDecision)
         
     def local_image_to_data_url(self, image_path: str) -> str:
@@ -33,17 +34,36 @@ class ImageClassifier:
 
         return f"data:{mime_type};base64,{base64_encoded_data}"
     
-    def classify_image(self, image_path: str) -> str:
-        """Analyzes the image to classify it as a medical image and determine it's type."""
+    def classify_image(self, image_path: str) -> dict:
+        """Analyzes the image to classify it as a medical image and determine its type."""
         print(f"[ImageAnalyzer] Analyzing image: {image_path}")
+
+        try:
+            return self._classify_image_impl(image_path)
+        except Exception as e:
+            print(f"[ImageAnalyzer] Error during vision classification: {e}")
+            return {"image_type": "unknown", "reasoning": str(e), "confidence": 0.0}
+
+    def _classify_image_impl(self, image_path: str) -> dict:
+        if self.enable_brain_mri:
+            type_instructions = (
+                "Determine if this is a medical image. If it is, classify it as:\n"
+                "'BRAIN MRI SCAN', 'CHEST X-RAY', 'SKIN LESION', or 'OTHER'. If it's not a medical image, return 'NON-MEDICAL'."
+            )
+        else:
+            type_instructions = (
+                "Determine if this is a medical image. If it is, classify it as:\n"
+                "'CHEST X-RAY', 'SKIN LESION', or 'OTHER'. Do NOT use 'BRAIN MRI SCAN' (that modality is disabled). "
+                "For brain or head MRI scans, use 'OTHER'.\n"
+                "If it's not a medical image, return 'NON-MEDICAL'."
+            )
 
         vision_prompt = [
             {"role": "system", "content": "You are an expert in medical imaging. Analyze the uploaded image."},
             {"role": "user", "content": [
                 {"type": "text", "text": (
-                    """
-                    Determine if this is a medical image. If it is, classify it as:
-                    'BRAIN MRI SCAN', 'CHEST X-RAY', 'SKIN LESION', or 'OTHER'. If it's not a medical image, return 'NON-MEDICAL'.
+                    f"""
+                    {type_instructions}
                     You must provide your answer in JSON format with the following structure:
                     {{
                     "image_type": "IMAGE TYPE",
@@ -66,5 +86,6 @@ class ImageClassifier:
         except json.JSONDecodeError:
             print("[ImageAnalyzer] Warning: Response was not valid JSON.")
             return {"image_type": "unknown", "reasoning": "Invalid JSON response", "confidence": 0.0}
-
-        # return response.content.strip().lower()
+        except Exception as e:
+            print(f"[ImageAnalyzer] Warning: Could not parse vision classification: {e}")
+            return {"image_type": "unknown", "reasoning": str(e), "confidence": 0.0}

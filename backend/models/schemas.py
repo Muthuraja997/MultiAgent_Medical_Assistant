@@ -114,7 +114,7 @@ class LoginResponse(BaseModel):
 
 class RegisterRequest(BaseModel):
     """Model for registration request"""
-    user_id: str = Field(..., description="Unique user/doctor ID (e.g., user_001, doc_001)")
+    user_id: str = Field(..., description="Unique login username for user or doctor (any reasonable string)")
     name: str = Field(..., description="Full name")
     password: str = Field(..., min_length=6, description="Password (minimum 6 characters)")
     user_type: UserType = Field(..., description="Register as USER or DOCTOR")
@@ -253,6 +253,30 @@ class AppointmentRequestUpdate(BaseModel):
     meet_link: Optional[str] = Field(None, description="Video meeting link if accepted")
 
 
+# ==================== DIRECT MESSAGES (USER / DOCTOR) ====================
+
+
+class DirectMessageSend(BaseModel):
+    """Send a direct message between two registered accounts (user_id or doctor_id)."""
+    sender_id: str = Field(..., description="Login id of the sender (user_id or doctor_id)")
+    receiver_id: str = Field(..., description="Login id of the recipient (user_id or doctor_id)")
+    message: str = Field(..., min_length=1, description="Message body")
+
+
+class DirectMessageItem(BaseModel):
+    """One persisted chat message."""
+    message_id: str
+    sender_id: str
+    receiver_id: str
+    message: str
+    created_at: datetime
+
+
+class DirectMessageListResponse(BaseModel):
+    """Thread between the viewer (user_id) and peer (peer_id)."""
+    messages: List[DirectMessageItem]
+
+
 # ==================== STATISTICS MODELS ====================
 
 class StatisticsResponse(BaseModel):
@@ -262,4 +286,20 @@ class StatisticsResponse(BaseModel):
     available_doctors: int
     total_meetings: int
     total_appointment_requests: int
+
+
+# ==================== LIVEKIT VOICE ====================
+
+
+class LiveKitVoiceTokenRequest(BaseModel):
+    """Optional client-supplied room name; server generates one if omitted."""
+    room_name: Optional[str] = Field(None, description="LiveKit room name")
+
+
+class LiveKitVoiceTokenResponse(BaseModel):
+    """Credentials for the browser LiveKit client."""
+    url: str = Field(..., description="WebSocket URL for the LiveKit project")
+    token: str = Field(..., description="JWT access token for the room")
+    room_name: str = Field(..., description="Room the token joins")
+    agent_name: str = Field(..., description="Agent dispatched to this room")
 

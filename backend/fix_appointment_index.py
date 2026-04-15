@@ -3,15 +3,27 @@ Script to fix the duplicate key error by dropping the incorrect appointment_id i
 """
 import asyncio
 from motor.motor_asyncio import AsyncIOMotorClient
+from dotenv import load_dotenv
+import os
+
+_backend_root = os.path.dirname(os.path.abspath(__file__))
+load_dotenv(os.path.join(_backend_root, ".env"))
+load_dotenv()
+
 
 async def fix_appointment_index():
     """Drop the problematic appointment_id unique index"""
     try:
-        # MongoDB Atlas connection
-        MONGODB_URI = "************************"
-        DATABASE_NAME = "medical_assistant_db"
-        
-        # Connect to MongoDB
+        MONGODB_URI = os.getenv("MONGODB_URI")
+        DATABASE_NAME = os.getenv("DATABASE_NAME", "medical_assistant_db")
+
+        if not MONGODB_URI:
+            raise ValueError(
+                "MONGODB_URI is not set. Add it to backend/.env (or export it) and retry."
+            )
+        if not MONGODB_URI.startswith(("mongodb://", "mongodb+srv://")):
+            raise ValueError("MONGODB_URI must start with mongodb:// or mongodb+srv://")
+
         client = AsyncIOMotorClient(MONGODB_URI)
         db = client[DATABASE_NAME]
         

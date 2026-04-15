@@ -77,18 +77,10 @@ class PsychologyAssistant:
                 self.gemini_llm = gemini_llm
                 logger.info("Using provided Gemini LLM for response generation")
             else:
-                from langchain_google_genai import ChatGoogleGenerativeAI
-                from dotenv import load_dotenv
-                import os
-                
-                load_dotenv()
+                from core.config import get_gemini_llm
+
                 logger.info("Initializing Google Gemini for response generation...")
-                self.gemini_llm = ChatGoogleGenerativeAI(
-                    model="gemini-2.0-flash-exp",
-                    google_api_key=os.getenv("GOOGLE_API_KEY"),
-                    temperature=0.7,
-                    convert_system_message_to_human=True
-                )
+                self.gemini_llm = get_gemini_llm(0.7)
                 logger.info("Google Gemini initialized successfully!")
         except Exception as e:
             logger.error(f"Could not initialize Gemini: {e}")

@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { LogIn, User, Lock, UserCog, Activity } from 'lucide-react';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState({
     user_id: '',
     password: '',
@@ -12,6 +13,16 @@ const Login: React.FC = () => {
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // e.g. return from /register?type=doctor — keep tab in sync with URL
+  useEffect(() => {
+    const t = (searchParams.get('type') || '').toLowerCase();
+    if (t === 'doctor') {
+      setFormData((prev) => ({ ...prev, user_type: 'DOCTOR' }));
+    } else if (t === 'user') {
+      setFormData((prev) => ({ ...prev, user_type: 'USER' }));
+    }
+  }, [searchParams]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -110,9 +121,7 @@ const Login: React.FC = () => {
           <form onSubmit={handleSubmit} className="space-y-6">
             {/* User ID Field */}
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                {formData.user_type === 'USER' ? 'User ID' : 'Doctor ID'}
-              </label>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
                 <input
@@ -120,7 +129,8 @@ const Login: React.FC = () => {
                   value={formData.user_id}
                   onChange={(e) => setFormData({ ...formData, user_id: e.target.value })}
                   className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  placeholder={`Enter your ${formData.user_type === 'USER' ? 'user' : 'doctor'} ID`}
+                  placeholder="Enter your username"
+                  autoComplete="username"
                   required
                 />
               </div>
@@ -184,18 +194,18 @@ const Login: React.FC = () => {
           {/* Footer */}
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600 mb-3">
-              Demo Users:
+              Demo (if seeded):
               <span className="text-xs text-gray-500 block mt-1">
-                User: user_001 | Doctor: doc_001
+                Use the usernames you registered, or any test accounts you created
               </span>
             </p>
             <p className="text-sm text-gray-600">
               Don't have an account?{' '}
-              <Link 
-                to="/register" 
+              <Link
+                to={formData.user_type === 'DOCTOR' ? '/register?type=doctor' : '/register?type=user'}
                 className={`font-semibold ${
-                  formData.user_type === 'USER' 
-                    ? 'text-blue-600 hover:text-blue-700' 
+                  formData.user_type === 'USER'
+                    ? 'text-blue-600 hover:text-blue-700'
                     : 'text-purple-600 hover:text-purple-700'
                 }`}
               >

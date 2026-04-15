@@ -10,7 +10,9 @@ you can do it by changing all 'llm' and 'embedding_model' variables present in m
 Each llm definition has unique temperature value relevant to the specific class. 
 
 Current Configuration:
-- LLM Provider: Google Gemini API (ChatGoogleGenerativeAI)
+- LLM Provider (app / REST agents only): AWS Bedrock when BEDROCK_MODEL_ID is set, else Google Gemini;
+  Bedrock failures fall back to Gemini (same get_gemini_llm() entrypoint). Voice LiveKit worker LLM is separate.
+- Gemini: env GEMINI_MODEL (default gemini-2.5-flash-lite), GOOGLE_API_KEY (required for fallback and when Bedrock off).
 - Embedding Model: Sentence-Transformers (all-MiniLM-L6-v2, 384-dim local embeddings)
 - Vector DB: Qdrant (localhost:6333)
 - Web Search: LangChain open-source tools
@@ -22,18 +24,81 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 # Lazy import for embeddings to avoid triggering heavy dependencies
 # from agents.rag_agent.embeddings_wrapper import SentenceTransformerEmbeddings
 
-# Load environment variables from .env file
+_backend_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+load_dotenv(os.path.join(_backend_root, ".env"))
 load_dotenv()
 
-# Lazy LLM initialization to avoid hanging on app startup
-def get_gemini_llm(temperature=0.1):
-    """Factory function for lazy ChatGoogleGenerativeAI initialization"""
+
+def _google_chat_model(temperature: float) -> ChatGoogleGenerativeAI:
+    """Google Gemini chat model (used alone or as Bedrock fallback)."""
+    api_key = os.getenv("GOOGLE_API_KEY")
+    if not api_key:
+        raise ValueError(
+            "GOOGLE_API_KEY is not set. Add your Google AI Studio key to .env "
+            "(see https://aistudio.google.com/apikey). Required when Bedrock is disabled "
+            "or as fallback when Bedrock is enabled."
+        )
+    model = os.getenv("GEMINI_MODEL", "gemini-2.5-flash-lite")
     return ChatGoogleGenerativeAI(
-        model="gemini-2.5-flash-lite",
-        google_api_key=os.getenv("GOOGLE_API_KEY"),
+        model=model,
+        google_api_key=api_key,
         temperature=temperature,
-        convert_system_message_to_human=True
+        convert_system_message_to_human=True,
     )
+
+
+def _use_bedrock_primary() -> bool:
+    """Bedrock is primary only when a model id is set and USE_BEDROCK is not explicitly off."""
+    if os.getenv("USE_BEDROCK", "").strip().lower() in ("0", "false", "no", "off"):
+        return False
+    return bool(os.getenv("BEDROCK_MODEL_ID", "").strip())
+
+
+def _bedrock_chat_model(temperature: float):
+    """AWS Bedrock chat model (LangChain Converse API)."""
+    try:
+        from langchain_aws import ChatBedrockConverse
+    except ImportError as e:
+        raise ImportError(
+            "Bedrock is configured but langchain-aws is not installed. "
+            "Run: pip install 'langchain-aws>=0.2.0,<0.3'"
+        ) from e
+
+    model_id = os.getenv("BEDROCK_MODEL_ID", "").strip()
+    region = (
+        os.getenv("AWS_DEFAULT_REGION") or os.getenv("AWS_REGION") or "us-east-1"
+    ).strip()
+    kwargs: dict = {
+        "model": model_id,
+        "region_name": region,
+        "temperature": temperature,
+    }
+    profile = os.getenv("AWS_PROFILE", "").strip()
+    if profile:
+        kwargs["credentials_profile_name"] = profile
+    return ChatBedrockConverse(**kwargs)
+
+
+def get_gemini_llm(temperature=0.1):
+    """
+    App-wide chat LLM factory (agents, RAG, guardrails, vision typing — not the voice worker).
+
+    - If Bedrock is enabled (BEDROCK_MODEL_ID set, USE_BEDROCK not false): Bedrock primary with Gemini fallback.
+    - Otherwise: Gemini only.
+    """
+    google = _google_chat_model(temperature)
+    if not _use_bedrock_primary():
+        return google
+
+    try:
+        bedrock = _bedrock_chat_model(temperature)
+        return bedrock.with_fallbacks([google])
+    except Exception as e:
+        print(
+            f"[config] Bedrock unavailable ({type(e).__name__}: {e}); using Gemini only "
+            "(set AWS credentials / BEDROCK_MODEL_ID / region, or pip install langchain-aws)."
+        )
+        return google
 
 class AgentDecisoinConfig:
     def __init__(self):
@@ -91,7 +156,7 @@ class RAGConfig:
         # Lazy initialization for embedding model (avoids large downloads at startup)
         self._embedding_model = None
         
-        # Lazy initialization for Gemini LLMs
+        # Lazy initialization for app LLMs (Bedrock + Gemini fallback via get_gemini_llm)
         self._llm = None
         self._summarizer_model = None
         self._chunker_model = None
@@ -154,6 +219,11 @@ class RAGConfig:
 
 class MedicalCVConfig:
     def __init__(self):
+        # Brain MRI classifier (off by default — no weights / UI hidden unless ENABLE_BRAIN_TUMOR_AGENT=true)
+        self.enable_brain_tumor_agent = os.getenv(
+            "ENABLE_BRAIN_TUMOR_AGENT", "false"
+        ).strip().lower() in ("1", "true", "yes", "on")
+        # DenseNet121 4-class MRI weights (glioma / meningioma / pituitary / notumor); legacy filename kept for compatibility
         self.brain_tumor_model_path = "./agents/image_analysis_agent/brain_tumor_agent/models/brain_tumor_segmentation.pth"
         self.chest_xray_model_path = "./agents/image_analysis_agent/chest_xray_agent/models/covid_chest_xray_model.pth"
         self.skin_lesion_model_path = "./agents/image_analysis_agent/skin_lesion_agent/models/checkpointN25_.pth.tar"

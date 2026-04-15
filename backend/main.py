@@ -7,6 +7,7 @@ Main application file with all API endpoints.
 import os
 import sys
 import uuid
+import json
 import glob
 import threading
 import time
@@ -17,8 +18,9 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 if current_dir not in sys.path:
     sys.path.insert(0, current_dir)
 
-from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Response, Cookie, Request
+from fastapi import FastAPI, UploadFile, File, Form, HTTPException, Response, Cookie, Request, Query
 from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
+from fastapi.exception_handlers import http_exception_handler
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -35,13 +37,19 @@ from models.schemas import (
     DoctorCreate, DoctorUpdate, DoctorResponse,
     MeetingCreate, MeetingUpdate, MeetingResponse,
     AppointmentRequestCreate, AppointmentRequestResponse, AppointmentRequestUpdate,
-    StatisticsResponse
+    StatisticsResponse,
+    LiveKitVoiceTokenRequest,
+    LiveKitVoiceTokenResponse,
+    DirectMessageSend,
+    DirectMessageItem,
+    DirectMessageListResponse,
 )
 from services.agent_service import AgentService
 from services.image_service import ImageService
 from services.speech_service import SpeechService
 from services.database_service import db_manager
 from core.config import Config
+from voice_agent.constants import MEDICAL_VOICE_AGENT_NAME
 
 # Load configuration
 config = Config()
@@ -55,19 +63,110 @@ app = FastAPI(
     redoc_url="/api/redoc"
 )
 
-# Configure CORS
+# Configure CORS — localhost + optional extra origins (comma-separated) + ngrok tunnels via regex
+_cors_origins = [
+    "http://localhost:3000",
+    "http://localhost:8000",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:8000",
+    "https://localhost:3000",
+    "https://127.0.0.1:3000",
+    "https://unhumidifying-relational-drema.ngrok-free.dev",
+]
+for _part in (os.getenv("CORS_EXTRA_ORIGINS") or "").split(","):
+    _u = _part.strip()
+    if _u and _u not in _cors_origins:
+        _cors_origins.append(_u)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",  # React dev server
-        "http://localhost:8000",  # Backend server
-        "http://127.0.0.1:3000",
-        "http://127.0.0.1:8000",
-    ],
+    allow_origins=_cors_origins,
+    # Browser hits ngrok / other tunnels with varying subdomains; OR with allow_origins above
+    allow_origin_regex=r"https://([a-z0-9-]+\.)*ngrok-free\.(dev|app)$|https://([a-z0-9-]+\.)*ngrok(\.io|\.app)$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+# --- User / doctor direct chat (registered early so it is never shadowed) ---
+
+
+def _assert_x_user_id_matches(claimed_id: str, request: Request) -> None:
+    """If client sends x-user-id, it must match the claimed user/doctor id (light auth hook)."""
+    header_uid = (request.headers.get("x-user-id") or "").strip()
+    if header_uid and header_uid != (claimed_id or "").strip():
+        raise HTTPException(
+            status_code=403,
+            detail="When x-user-id is sent, it must match sender_id or user_id for this request.",
+        )
+
+
+@app.post("/api/messages", response_model=DirectMessageItem, tags=["Messages"])
+async def send_direct_message_early(payload: DirectMessageSend, request: Request):
+    """Send a direct message (canonical path: /api/messages)."""
+    _assert_x_user_id_matches(payload.sender_id, request)
+    try:
+        row = await db_manager.send_direct_message(
+            payload.sender_id, payload.receiver_id, payload.message
+        )
+        return DirectMessageItem(**row)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/messages", response_model=DirectMessageListResponse, tags=["Messages"])
+async def list_direct_messages_early(
+    request: Request,
+    user_id: str = Query(..., description="Viewer login id (user_id or doctor_id)"),
+    peer_id: str = Query(..., description="Other party login id (user_id or doctor_id)"),
+    limit: int = Query(200, ge=1, le=500),
+):
+    """List thread (canonical path: /api/messages)."""
+    _assert_x_user_id_matches(user_id, request)
+    try:
+        rows = await db_manager.list_direct_messages(user_id, peer_id, limit=limit)
+        return DirectMessageListResponse(messages=[DirectMessageItem(**r) for r in rows])
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/direct-messages", response_model=DirectMessageItem, tags=["Messages"])
+async def send_direct_message_alias(payload: DirectMessageSend, request: Request):
+    """Alias of POST /api/messages."""
+    _assert_x_user_id_matches(payload.sender_id, request)
+    try:
+        row = await db_manager.send_direct_message(
+            payload.sender_id, payload.receiver_id, payload.message
+        )
+        return DirectMessageItem(**row)
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/direct-messages", response_model=DirectMessageListResponse, tags=["Messages"])
+async def list_direct_messages_alias(
+    request: Request,
+    user_id: str = Query(..., description="Viewer login id (user_id or doctor_id)"),
+    peer_id: str = Query(..., description="Other party login id (user_id or doctor_id)"),
+    limit: int = Query(200, ge=1, le=500),
+):
+    """Alias of GET /api/messages."""
+    _assert_x_user_id_matches(user_id, request)
+    try:
+        rows = await db_manager.list_direct_messages(user_id, peer_id, limit=limit)
+        return DirectMessageListResponse(messages=[DirectMessageItem(**r) for r in rows])
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 
 # Set up directories (in common folder)
 UPLOAD_FOLDER = "../common/uploads/backend"
@@ -140,6 +239,73 @@ def health_check():
     Health check endpoint for monitoring and Docker health checks.
     """
     return HealthResponse(status="healthy", version="2.0.0")
+
+
+@app.post(
+    "/api/voice/livekit-token",
+    response_model=LiveKitVoiceTokenResponse,
+    tags=["Voice"],
+)
+def create_livekit_voice_token(
+    body: LiveKitVoiceTokenRequest,
+    request: Request,
+):
+    """
+    Mint a LiveKit participant JWT that dispatches the medical voice agent to the room.
+    Requires LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET. Run the voice worker separately.
+    """
+    try:
+        from livekit import api as livekit_api
+    except ImportError as e:
+        raise HTTPException(
+            status_code=503,
+            detail="livekit-api is not installed. Install backend requirements including livekit packages.",
+        ) from e
+
+    lk_url = os.getenv("LIVEKIT_URL")
+    if not lk_url:
+        raise HTTPException(
+            status_code=503,
+            detail="LIVEKIT_URL is not configured.",
+        )
+
+    room_name = (body.room_name or "").strip() or f"voice-medical-{uuid.uuid4().hex[:16]}"
+    user_id = request.headers.get("x-user-id") or ""
+    identity = f"user-{user_id}" if user_id else f"user-{uuid.uuid4().hex[:12]}"
+    display = "Medical app user"
+
+    metadata = json.dumps({"source": "multi_agent_medical_assistant"})
+    room_config = livekit_api.RoomConfiguration(
+        agents=[
+            livekit_api.RoomAgentDispatch(
+                agent_name=MEDICAL_VOICE_AGENT_NAME,
+                metadata=metadata,
+            )
+        ],
+    )
+
+    token = (
+        livekit_api.AccessToken()
+        .with_identity(identity)
+        .with_name(display)
+        .with_grants(
+            livekit_api.VideoGrants(
+                room_join=True,
+                room=room_name,
+                can_publish=True,
+                can_subscribe=True,
+            )
+        )
+        .with_room_config(room_config)
+        .to_jwt()
+    )
+
+    return LiveKitVoiceTokenResponse(
+        url=lk_url,
+        token=token,
+        room_name=room_name,
+        agent_name=MEDICAL_VOICE_AGENT_NAME,
+    )
 
 
 @app.post("/api/chat", response_model=ChatResponse, tags=["Chat"])
@@ -249,9 +415,13 @@ async def upload_image(
         )
         
     except Exception as e:
-        # Clean up file on error
+        import traceback
+
         image_service.delete_file(file_path)
-        raise HTTPException(status_code=500, detail=str(e))
+        error_msg = f"{type(e).__name__}: {str(e)}"
+        print(f"[ERROR] Upload / image processing: {error_msg}")
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=error_msg)
 
 
 @app.post("/api/validate", response_model=ValidationResponse, tags=["Validation"])
@@ -539,23 +709,21 @@ async def login(login_request: LoginRequest):
 async def register(register_request: RegisterRequest):
     """User/Doctor registration endpoint"""
     try:
-        # Validate user_id format
         user_type = register_request.user_type.value
-        if user_type == "USER" and not register_request.user_id.startswith("user_"):
-            return RegisterResponse(
-                success=False,
-                message="User ID must start with 'user_' (e.g., user_001)"
-            )
-        elif user_type == "DOCTOR" and not register_request.user_id.startswith("doc_"):
-            return RegisterResponse(
-                success=False,
-                message="Doctor ID must start with 'doc_' (e.g., doc_001)"
-            )
-        
-        # Register user/doctor
+        user_id = (register_request.user_id or "").strip()
+        name = (register_request.name or "").strip()
+
+        if not user_id:
+            return RegisterResponse(success=False, message="Username cannot be empty.")
+        if len(user_id) > 128:
+            return RegisterResponse(success=False, message="Username must be at most 128 characters.")
+        if not name:
+            return RegisterResponse(success=False, message="Name cannot be empty.")
+
+        # Register user/doctor (doctors get available_status=True in database_service)
         result = await db_manager.register_user({
-            "user_id": register_request.user_id,
-            "name": register_request.name,
+            "user_id": user_id,
+            "name": name,
             "password": register_request.password,
             "user_type": user_type,
             "email": register_request.email,
@@ -565,14 +733,14 @@ async def register(register_request: RegisterRequest):
         if not result:
             return RegisterResponse(
                 success=False,
-                message=f"This {user_type.lower()} ID is already taken. Please choose another."
+                message=f"This username is already taken. Please choose another."
             )
         
         return RegisterResponse(
             success=True,
             message="Registration successful! You can now login.",
-            user_id=register_request.user_id,
-            user_name=register_request.name,
+            user_id=user_id,
+            user_name=name,
             user_type=register_request.user_type
         )
     except Exception as e:
@@ -740,7 +908,10 @@ async def delete_doctor(doctor_id: str):
 
 
 @app.patch("/api/doctors/{doctor_id}/availability", response_model=dict, tags=["Doctors"])
-async def update_doctor_availability(doctor_id: str, available: bool):
+async def update_doctor_availability(
+    doctor_id: str,
+    available: bool = Query(..., description="true = accepting patients, false = unavailable"),
+):
     """Update doctor availability status"""
     try:
         success = await db_manager.update_doctor_availability(doctor_id, available)
@@ -969,6 +1140,32 @@ async def update_appointment_request(request_id: str, update: AppointmentRequest
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.delete("/api/appointment-requests/{request_id}", response_model=dict, tags=["Appointment Requests"])
+async def remove_completed_appointment(
+    request_id: str,
+    actor_id: str = Query(..., description="user_id of the logged-in user or doctor ending the consultation"),
+):
+    """Remove an ACCEPTED appointment and its meeting after the consultation is finished (user or doctor)."""
+    try:
+        result = await db_manager.remove_completed_consultation(request_id, actor_id)
+        if not result.get("success"):
+            msg = result.get("message", "Cannot remove appointment")
+            if "not found" in msg.lower():
+                status = 404
+            elif "Only the patient" in msg or "doctor can end" in msg:
+                status = 403
+            elif "Invalid appointment" in msg:
+                status = 400
+            else:
+                status = 400
+            raise HTTPException(status_code=status, detail=msg)
+        return {"status": "success", "message": result.get("message", "Removed")}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 # ==================== ADMIN DASHBOARD ENDPOINTS ====================
 
 @app.get("/api/admin/statistics", response_model=StatisticsResponse, tags=["Admin"])
@@ -995,10 +1192,12 @@ async def request_entity_too_large(request: Request, exc: Exception):
     )
 
 
-# Global exception handler
+# Global exception handler (do not swallow HTTPException / validation errors)
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
-    """Handle all unhandled exceptions"""
+    """Handle unexpected exceptions; delegate HTTPException to FastAPI defaults."""
+    if isinstance(exc, HTTPException):
+        return await http_exception_handler(request, exc)
     print(f"[ERROR] Unhandled exception: {str(exc)}")
     return JSONResponse(
         status_code=500,

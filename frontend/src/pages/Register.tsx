@@ -1,10 +1,16 @@
-import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, Link, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { UserPlus, User, Lock, UserCog, Activity, Mail, Phone, ArrowLeft } from 'lucide-react';
 
+function accountTypeFromSearch(search: string): 'USER' | 'DOCTOR' {
+  const t = new URLSearchParams(search).get('type')?.toLowerCase();
+  return t === 'doctor' ? 'DOCTOR' : 'USER';
+}
+
 const Register: React.FC = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [formData, setFormData] = useState({
     user_id: '',
     name: '',
@@ -12,8 +18,21 @@ const Register: React.FC = () => {
     confirmPassword: '',
     email: '',
     phone: '',
-    user_type: 'USER' as 'USER' | 'DOCTOR'
+    user_type: accountTypeFromSearch(typeof window !== 'undefined' ? window.location.search : ''),
   });
+
+  useEffect(() => {
+    const next = accountTypeFromSearch(`?${searchParams.toString()}`);
+    setFormData((prev) =>
+      prev.user_type === next
+        ? prev
+        : {
+            ...prev,
+            user_type: next,
+            user_id: '',
+          }
+    );
+  }, [searchParams]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -38,10 +57,14 @@ const Register: React.FC = () => {
       return;
     }
 
-    // Validate user_id format
-    const prefix = formData.user_type === 'USER' ? 'user_' : 'doc_';
-    if (!formData.user_id.startsWith(prefix)) {
-      setError(`${formData.user_type === 'USER' ? 'User' : 'Doctor'} ID must start with '${prefix}' (e.g., ${prefix}001)`);
+    const username = formData.user_id.trim();
+    if (!username) {
+      setError('Please enter a username.');
+      setLoading(false);
+      return;
+    }
+    if (username.length > 128) {
+      setError('Username must be at most 128 characters.');
       setLoading(false);
       return;
     }
@@ -53,8 +76,8 @@ const Register: React.FC = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          user_id: formData.user_id,
-          name: formData.name,
+          user_id: username,
+          name: formData.name.trim(),
           password: formData.password,
           user_type: formData.user_type,
           email: formData.email || undefined,
@@ -67,7 +90,7 @@ const Register: React.FC = () => {
       if (data.success) {
         setSuccess('Registration successful! Redirecting to login...');
         setTimeout(() => {
-          navigate('/login');
+          navigate(formData.user_type === 'DOCTOR' ? '/login?type=doctor' : '/login?type=user');
         }, 2000);
       } else {
         setError(data.message || 'Registration failed');
@@ -148,10 +171,10 @@ const Register: React.FC = () => {
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {/* User/Doctor ID Field */}
+            {/* Login username (same for users and doctors) */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                {formData.user_type === 'USER' ? 'User ID' : 'Doctor ID'}
+                Username
                 <span className="text-red-500 ml-1">*</span>
               </label>
               <div className="relative">
@@ -161,12 +184,13 @@ const Register: React.FC = () => {
                   value={formData.user_id}
                   onChange={(e) => setFormData({ ...formData, user_id: e.target.value })}
                   className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  placeholder={`${formData.user_type === 'USER' ? 'user_' : 'doc_'}001`}
+                  placeholder="e.g. jane_smith, DrAli, clinic_north_01"
+                  autoComplete="username"
                   required
                 />
               </div>
               <p className="text-xs text-gray-500 mt-1">
-                Must start with '{formData.user_type === 'USER' ? 'user_' : 'doc_'}' (e.g., {formData.user_type === 'USER' ? 'user_' : 'doc_'}001)
+                Choose any unique username (letters, numbers, spaces, underscores, etc.). Used when you log in.
               </p>
             </div>
 
@@ -314,8 +338,8 @@ const Register: React.FC = () => {
           <div className="mt-6 text-center">
             <p className="text-sm text-gray-600">
               Already have an account?{' '}
-              <Link 
-                to="/login" 
+              <Link
+                to={formData.user_type === 'DOCTOR' ? '/login?type=doctor' : '/login?type=user'}
                 className={`font-semibold ${
                   formData.user_type === 'USER' 
                     ? 'text-blue-600 hover:text-blue-700' 

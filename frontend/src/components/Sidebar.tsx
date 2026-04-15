@@ -2,7 +2,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard,
   Brain,
-  BarChart3,
   Settings,
   Activity,
   MapPin,
@@ -10,6 +9,9 @@ import {
   Shield,
   LogOut,
   Home,
+  UserCog,
+  Mic,
+  MessageCircle,
 } from 'lucide-react';
 
 const Sidebar = () => {
@@ -18,6 +20,7 @@ const Sidebar = () => {
   const userType = localStorage.getItem('user_type');
   const userId = localStorage.getItem('user_id');
   const isAdmin = userType === 'ADMIN' || userId === 'admin_001';
+  const isDoctor = userType === 'DOCTOR';
 
   const handleLogout = () => {
     localStorage.removeItem('user_id');
@@ -29,11 +32,15 @@ const Sidebar = () => {
 
   const menuItems = [
     { path: '/home', icon: Home, label: 'Home', color: 'cyan' },
+    ...(isDoctor
+      ? [{ path: '/doctor-status', icon: UserCog, label: 'Update status', color: 'amber' }]
+      : []),
     { path: '/dashboard', icon: LayoutDashboard, label: 'Dashboard', color: 'blue' },
     { path: '/agents', icon: Brain, label: 'AI Agents', color: 'purple' },
+    { path: '/voice-agent', icon: Mic, label: 'Voice agent', color: 'violet' },
+    { path: '/messages', icon: MessageCircle, label: 'Messages', color: 'teal' },
     { path: '/video-consultation', icon: Video, label: 'Video Call', color: 'indigo' },
     { path: '/hospitals', icon: MapPin, label: 'Hospitals', color: 'red' },
-    { path: '/analytics', icon: BarChart3, label: 'Analytics', color: 'green' },
     ...(isAdmin ? [{ path: '/admin', icon: Shield, label: 'Admin', color: 'orange' }] : []),
   ];
 

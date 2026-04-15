@@ -23,8 +23,8 @@ class MedicalRAG:
         Args:
             config: Configuration object with RAG settings
         """
-        # Lazy imports here to avoid loading heavy dependencies at app startup
-        from .doc_parser import MedicalDocParser
+        # Lazy imports here to avoid loading heavy dependencies at app startup.
+        # doc_parser pulls in docling — only needed for ingest_*, not for process_query (retrieval).
         from .content_processor import ContentProcessor
         from .vectorstore_qdrant import VectorStore
         from .reranker import Reranker
@@ -35,13 +35,27 @@ class MedicalRAG:
         self.logger = logging.getLogger(f"{self.__module__}")
         self.logger.info("Initializing Medical RAG system")
         self.config = config
-        self.doc_parser = MedicalDocParser()
+        self._doc_parser = None
         self.content_processor = ContentProcessor(config)
         self.vector_store = VectorStore(config)
         self.reranker = Reranker(config)
         self.query_expander = QueryExpander(config)
         self.response_generator = ResponseGenerator(config)
         self.parsed_content_dir = self.config.rag.parsed_content_dir
+
+    def _get_doc_parser(self):
+        """Load docling-backed parser only when ingesting documents (not for retrieval queries)."""
+        if self._doc_parser is not None:
+            return self._doc_parser
+        try:
+            from .doc_parser import MedicalDocParser
+        except ModuleNotFoundError as e:
+            raise ModuleNotFoundError(
+                "docling is required for RAG document ingestion (ingest_file / ingest_directory). "
+                "Retrieval-only chat does not need it. Install with: pip install docling docling-core"
+            ) from e
+        self._doc_parser = MedicalDocParser()
+        return self._doc_parser
     
     def ingest_directory(self, directory_path: str) -> Dict[str, Any]:
         """
@@ -133,7 +147,7 @@ class MedicalRAG:
         try:
             # Step 1: Parse document
             self.logger.info("1. Parsing document and extracting images...")
-            parsed_document, images = self.doc_parser.parse_document(document_path, self.parsed_content_dir)
+            parsed_document, images = self._get_doc_parser().parse_document(document_path, self.parsed_content_dir)
             self.logger.info(f"   Parsed document and extracted {len(images)} images")
 
             # Step 2: Summarize images

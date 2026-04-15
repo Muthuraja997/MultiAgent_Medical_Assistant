@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import Dashboard from './pages/Dashboard';
-import Analytics from './pages/Analytics';
 import AgentsPage from './pages/AgentsPage';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
@@ -12,6 +11,9 @@ import AdminDashboard from './pages/AdminDashboard';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import HomePage from './pages/HomePage';
+import DoctorAvailability from './pages/DoctorAvailability';
+import VoiceAgent from './pages/VoiceAgent';
+import Messages from './pages/Messages';
 
 // Protected Route Component
 function ProtectedRoute({ children }: { children: React.ReactNode }) {
@@ -89,9 +91,11 @@ function App() {
                     <Routes>
                       <Route path="/" element={<Navigate to="/home" replace />} />
                       <Route path="/home" element={<HomePage />} />
+                      <Route path="/doctor-status" element={<DoctorAvailability />} />
                       <Route path="/dashboard" element={<Dashboard />} />
-                      <Route path="/analytics" element={<Analytics />} />
                       <Route path="/agents" element={<AgentsPage />} />
+                      <Route path="/voice-agent" element={<VoiceAgent />} />
+                      <Route path="/messages" element={<Messages />} />
                       <Route path="/hospitals" element={<HospitalLocator />} />
                       <Route path="/video-consultation" element={<VideoConsultation />} />
                       <Route 

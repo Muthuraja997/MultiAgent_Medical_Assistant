@@ -7,10 +7,13 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true, // Allow external access
+    // ngrok and similar tunnels (new free.dev hostnames + legacy .app / .io)
     allowedHosts: [
-      'unhumidifying-relational-drema.ngrok-free.dev',
+      '.ngrok-free.dev',
       '.ngrok-free.app',
       '.ngrok.io',
+      '.ngrok.app',
+      'unhumidifying-relational-drema.ngrok-free.dev',
     ],
     proxy: {
       '/api': {
